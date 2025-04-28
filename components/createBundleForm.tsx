@@ -1,6 +1,7 @@
 import {
-    Box, Button, FormGroup, H3, Input, Panel, Select, Table, Text,
-  } from '@bigcommerce/big-design';
+  Box, Button, Flex, FlexItem, FormGroup, H3, Input, Panel, Select, Table, Text,
+} from '@bigcommerce/big-design';
+
   import { useEffect, useMemo, useState } from 'react';
   
   type SKUOption = {
@@ -18,7 +19,7 @@ import {
   
   interface BundleFormProps {
     availableSKUs: { sku: string; name: string; price: number; stock: number }[];
-    onSubmit: (bundle: { name: string; items: SKUItem[] }) => void;
+    onSubmit: (bundle: { name: string; items: SKUItem[]; price: number }) => void;
     onCancel: () => void;
   }
   
@@ -32,11 +33,13 @@ import {
       () =>
         availableSKUs.map(({ sku, name, stock }) => ({
           value: sku,
-          content: `${sku} - ${name} (${stock} in stock)`,
-          disabled: stock === 0,
+          content: stock > 0
+            ? `${sku} - ${name} (${stock} in stock)`
+            : `⚠️ ${sku} - ${name} (Out of stock)`,
         })),
       [availableSKUs]
     );
+    
     
   
     const handleAddSKU = () => {
@@ -84,7 +87,7 @@ import {
         </FormGroup>
         <FormGroup>
         <Input
-          label="Override Total Price (optional)"
+          label="Override Total Price"
           type="number"
           placeholder="Enter custom price"
           value={customPrice ?? ''}
@@ -96,18 +99,28 @@ import {
         />
       </FormGroup>
 
-        <FormGroup>
-          <Select
-            label="Add SKU"
-            options={skuOptions}
-            value={selectedSKU}
-            onOptionChange={setSelectedSKU}
-            placeholder="Search and select SKU"
-          />
-          <Box marginTop="small">
-            <Button onClick={handleAddSKU}>Add SKU</Button>
-          </Box>
-        </FormGroup>
+      <FormGroup>
+        <Flex alignItems="flex-end">
+          <FlexItem flexGrow={1} marginRight="small">
+            <Select
+              label="Add SKU"
+              options={skuOptions}
+              value={selectedSKU}
+              onOptionChange={setSelectedSKU}
+              placeholder="Search and select SKU"
+            />
+          </FlexItem>
+          <Button
+            marginTop="large"
+            onClick={handleAddSKU}
+            disabled={!selectedSKU}
+          >
+            Add SKU
+          </Button>
+        </Flex>
+      </FormGroup>
+
+
   
         <Box marginVertical="large">
           {bundleItems.length > 0 ? (
@@ -170,10 +183,17 @@ import {
           </Button>
           <Button
             disabled={!bundleName || bundleItems.length === 0}
-            onClick={() => onSubmit({ name: bundleName, items: bundleItems })}
+            onClick={() =>
+              onSubmit({
+                name: bundleName,
+                items: bundleItems,
+                price: customPrice !== null ? customPrice : totalPrice, // ✅ send price too
+              })
+            }
           >
             Save Bundle
           </Button>
+
         </Box>
       </Panel>
     );

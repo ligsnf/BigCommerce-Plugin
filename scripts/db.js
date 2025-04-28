@@ -9,10 +9,10 @@ const MYSQL_CONFIG = {
   database: process.env.MYSQL_DATABASE,
   user: process.env.MYSQL_USERNAME,
   password: process.env.MYSQL_PASSWORD,
-  port: process.env.MYSQL_PORT || 3306,
+  ...(process.env.MYSQL_PORT && { port: process.env.MYSQL_PORT }),
 };
 
-const connection = mysql.createConnection(MYSQL_CONFIG);
+const connection = mysql.createConnection(process.env.DATABASE_URL ? process.env.DATABASE_URL : MYSQL_CONFIG);
 const query = util.promisify(connection.query.bind(connection));
 
 // Set up BigCommerce API client
@@ -26,6 +26,43 @@ const bigcommerce = axios.create({
 });
 
 async function createTables() {
+  // Create users table
+  await query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+      userId INT(11) NOT NULL,
+      email TEXT NOT NULL,
+      username TEXT,
+      PRIMARY KEY (id),
+      UNIQUE KEY userId (userId)
+    ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;
+  `);
+
+  // Create stores table
+  await query(`
+    CREATE TABLE IF NOT EXISTS stores (
+      id INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+      storeHash VARCHAR(10) NOT NULL,
+      accessToken TEXT,
+      scope TEXT,
+      PRIMARY KEY (id),
+      UNIQUE KEY storeHash (storeHash)
+    ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;
+  `);
+
+  // Create storeUsers table
+  await query(`
+    CREATE TABLE IF NOT EXISTS storeUsers (
+      id INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+      userId INT(11) NOT NULL,
+      storeHash VARCHAR(10) NOT NULL,
+      isAdmin BOOLEAN,
+      PRIMARY KEY (id),
+      UNIQUE KEY userId (userId, storeHash)
+    ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;
+  `);
+
+  // Create products table
   await query(`
     CREATE TABLE IF NOT EXISTS products (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -36,6 +73,7 @@ async function createTables() {
     );
   `);
 
+  // Create bundles table
   await query(`
     CREATE TABLE IF NOT EXISTS bundles (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -44,6 +82,7 @@ async function createTables() {
     );
   `);
 
+  // Create bundle_items table
   await query(`
     CREATE TABLE IF NOT EXISTS bundle_items (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -54,38 +93,44 @@ async function createTables() {
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
   `);
+
+  console.log('[DB] ✅ Tables created or already exist.');
 }
 
 async function syncProductsFromBigCommerce() {
-  console.log('[DB] Syncing products from BigCommerce...');
+  console.log('[DB] 🔄 Syncing products from BigCommerce...');
 
-  const { data } = await bigcommerce.get('/catalog/products?limit=250');
+  try {
+    const { data } = await bigcommerce.get('/catalog/products?limit=250');
 
-  for (const p of data.data) {
-    if (!p.sku) continue;
+    for (const p of data.data) {
+      if (!p.sku) continue;
 
-    const sku = p.sku;
-    const name = p.name;
-    const stock = p.inventory_level || 0;
-    const price = p.price || 0.00;
+      const sku = p.sku;
+      const name = p.name;
+      const stock = p.inventory_level || 0;
+      const price = p.price || 0.00;
 
-    await query(`
-      INSERT INTO products (sku, name, stock, price)
-      VALUES (?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        name = VALUES(name),
-        stock = VALUES(stock),
-        price = VALUES(price);
-    `, [sku, name, stock, price]);
+      await query(`
+        INSERT INTO products (sku, name, stock, price)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          name = VALUES(name),
+          stock = VALUES(stock),
+          price = VALUES(price);
+      `, [sku, name, stock, price]);
+    }
+
+    console.log(`[DB] ✅ Synced ${data.data.length} products from BigCommerce.`);
+  } catch (error) {
+    console.error('[DB] ❌ Error syncing products:', error.message);
   }
-
-  console.log(`[DB] ✅ Synced ${data.data.length} products from BigCommerce.`);
 }
 
 (async () => {
   try {
     await createTables();
-    await syncProductsFromBigCommerce();
+    await syncProductsFromBigCommerce(); // 👈 now also syncing
   } catch (err) {
     console.error('[DB] ❌ Error:', err.message);
   } finally {

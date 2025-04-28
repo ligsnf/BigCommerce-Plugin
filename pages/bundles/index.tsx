@@ -15,10 +15,22 @@ const BundlesPage = () => {
     stock: inventory_level,
   }));
 
-  const handleSubmit = (bundle) => {
-    console.log('Submitted bundle:', bundle);
-    // TODO: POST bundle to your backend API
+  const handleSubmit = async (bundle) => {
+    const res = await fetch('/api/bundles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bundle),
+    });
+  
+    const data = await res.json();
+  
+    if (res.ok) {
+      alert('✅ Bundle saved successfully!');
+    } else {
+      alert(`❌ Failed to save bundle: ${data.message}`);
+    }
   };
+  
 
   const handleCancel = () => {
     console.log('Cancelled');
