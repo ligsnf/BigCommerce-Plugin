@@ -12,7 +12,7 @@ export const TabIds = {
 export const TabRoutes = {
     [TabIds.HOME]: '/',
     [TabIds.PRODUCTS]: '/products',
-    [TabIds.BUNDLES]: '/bundles'
+    [TabIds.BUNDLES]: '/bundles/list'
 };
 
 const HeaderlessRoutes = [
