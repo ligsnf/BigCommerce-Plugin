@@ -1,48 +1,94 @@
 const mysql = require('mysql2');
 const util = require('util');
+const axios = require('axios');
 require('dotenv').config();
 
+// Set up MySQL connection
 const MYSQL_CONFIG = {
-    host: process.env.MYSQL_HOST,
-    database: process.env.MYSQL_DATABASE,
-    user: process.env.MYSQL_USERNAME,
-    password: process.env.MYSQL_PASSWORD,
-    ...(process.env.MYSQL_PORT && { port: process.env.MYSQL_PORT }),
+  host: process.env.MYSQL_HOST,
+  database: process.env.MYSQL_DATABASE,
+  user: process.env.MYSQL_USERNAME,
+  password: process.env.MYSQL_PASSWORD,
+  port: process.env.MYSQL_PORT || 3306,
 };
 
-const connection = mysql.createConnection(process.env.DATABASE_URL ? process.env.DATABASE_URL : MYSQL_CONFIG);
+const connection = mysql.createConnection(MYSQL_CONFIG);
 const query = util.promisify(connection.query.bind(connection));
 
-const usersCreate = query('CREATE TABLE `users` (\n' +
-    '  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,\n' +
-    '  `userId` int(11) NOT NULL,\n' +
-    '  `email` text NOT NULL,\n' +
-    '  `username` text,\n' +
-    '  PRIMARY KEY (`id`),\n' +
-    '  UNIQUE KEY `userId` (`userId`)\n' +
-    ') ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;\n'
-);
-
-const storesCreate = query('CREATE TABLE `stores` (\n' +
-    '  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,\n' +
-    '  `storeHash` varchar(10) NOT NULL,\n' +
-    '  `accessToken` text,\n' +
-    '  `scope` text,\n' +
-    '  PRIMARY KEY (`id`),\n' +
-    '  UNIQUE KEY `storeHash` (`storeHash`)\n' +
-    ') ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;'
-);
-
-const storeUsersCreate = query('CREATE TABLE `storeUsers` (\n' +
-    '  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,\n' +
-    '  `userId` int(11) NOT NULL,\n' +
-    '  `storeHash` varchar(10) NOT NULL,\n' +
-    '  `isAdmin` boolean,\n' +
-    '  PRIMARY KEY (`id`),\n' +
-    '  UNIQUE KEY `userId` (`userId`,`storeHash`)\n' +
-    ') ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;\n'
-);
-
-Promise.all([usersCreate, storesCreate]).then(() => {
-    connection.end();
+// Set up BigCommerce API client
+const bigcommerce = axios.create({
+  baseURL: `https://api.bigcommerce.com/stores/${process.env.STORE_HASH}/v3`,
+  headers: {
+    'X-Auth-Token': process.env.ACCESS_TOKEN,
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  },
 });
+
+async function createTables() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      sku VARCHAR(100) NOT NULL UNIQUE,
+      name VARCHAR(255) NOT NULL,
+      stock INT NOT NULL,
+      price DECIMAL(10,2) NOT NULL
+    );
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS bundles (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      price DECIMAL(10,2) NOT NULL DEFAULT 0
+    );
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS bundle_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      bundle_id INT NOT NULL,
+      product_id INT NOT NULL,
+      quantity INT NOT NULL,
+      FOREIGN KEY (bundle_id) REFERENCES bundles(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+  `);
+}
+
+async function syncProductsFromBigCommerce() {
+  console.log('[DB] Syncing products from BigCommerce...');
+
+  const { data } = await bigcommerce.get('/catalog/products?limit=250');
+
+  for (const p of data.data) {
+    if (!p.sku) continue;
+
+    const sku = p.sku;
+    const name = p.name;
+    const stock = p.inventory_level || 0;
+    const price = p.price || 0.00;
+
+    await query(`
+      INSERT INTO products (sku, name, stock, price)
+      VALUES (?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        stock = VALUES(stock),
+        price = VALUES(price);
+    `, [sku, name, stock, price]);
+  }
+
+  console.log(`[DB] ✅ Synced ${data.data.length} products from BigCommerce.`);
+}
+
+(async () => {
+  try {
+    await createTables();
+    await syncProductsFromBigCommerce();
+  } catch (err) {
+    console.error('[DB] ❌ Error:', err.message);
+  } finally {
+    connection.end();
+  }
+})();

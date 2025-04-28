@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import ErrorMessage from '../components/error';
 import Loading from '../components/loading';
 import { useProducts } from '../lib/hooks';
+import ProductCard from '../components/productCard';
+import CreateBundlePage from '../pages/products/'
 
 const Index = () => {
     const { error, isLoading, summary } = useProducts();
@@ -25,7 +27,17 @@ const Index = () => {
                     <H4>Primary category</H4>
                     <H1 marginBottom="none">{summary.primary_category_name}</H1>
                 </StyledBox>
+                <StyledBox border="box" borderRadius="normal" padding="medium">
+                <ProductCard
+  bundleName="Aussie Spirit + Travel Set"
+  products={[
+    { name: 'Aussie Spirit Chess Set', sku: 'AUS-DR', stock: 2, price: 349.00 },
+    { name: 'Magnetic Travel 3-in-1 Set', sku: 'L38810DR', stock: 6, price: 39.00 }
+  ]}
+/>
+                </StyledBox>
             </Flex>
+
         </Panel>
     );
 };
