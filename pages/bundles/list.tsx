@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Loading from '../../components/loading';
 import ErrorMessage from '../../components/error';
+import { Dropdown } from '@bigcommerce/big-design';
+import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
 
 const BundlesListPage = () => {
   const [bundles, setBundles] = useState([]);
@@ -10,6 +12,29 @@ const BundlesListPage = () => {
   const [error, setError] = useState(null);
   const router = useRouter();
 
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this bundle?')) {
+      return;
+    }
+  
+    try {
+      const res = await fetch(`/api/bundles/${id}`, {
+        method: 'DELETE',
+      });
+  
+      if (res.ok) {
+        alert('✅ Bundle deleted successfully!');
+        router.reload(); // Refresh the list
+      } else {
+        const data = await res.json();
+        alert(`❌ Failed to delete bundle: ${data.message}`);
+      }
+    } catch (err) {
+      alert('❌ An error occurred while deleting the bundle.');
+      console.error(err);
+    }
+  };
+  
   useEffect(() => {
     const fetchBundles = async () => {
       try {
@@ -43,14 +68,28 @@ const BundlesListPage = () => {
 
       {bundles.length > 0 ? (
         <Table
-          columns={[
-            { header: 'Name', hash: 'name', render: ({ name }) => <Text>{name}</Text> },
-            { header: 'Price', hash: 'price', render: ({ price }) => <Text>${price}</Text> },
-          ]}
-          items={bundles}
-          itemName="Bundle"
-          stickyHeader
-        />
+        columns={[
+          { header: 'Name', hash: 'name', render: ({ name }) => <Text>{name}</Text> },
+          { header: 'Price', hash: 'price', render: ({ price }) => <Text>${price}</Text> },
+          {
+            header: 'Action',
+            hideHeader: true,
+            hash: 'id',
+            render: ({ id }) => (
+              <Dropdown
+                toggle={<Button iconOnly={<MoreHorizIcon color="secondary60" />} variant="subtle" />}
+                items={[
+                  { content: 'Edit', onItemClick: () => router.push(`/bundles/edit/${id}`) },
+                  { content: 'Delete', onItemClick: () => handleDelete(id), color: 'danger' },
+                ]}
+              />
+            ),
+          } 
+        ]}
+        items={bundles}
+        itemName="Bundle"
+        stickyHeader
+      />
       ) : (
         <Text>No bundles found.</Text>
       )}

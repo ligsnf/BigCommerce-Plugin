@@ -21,13 +21,18 @@ import {
     availableSKUs: { sku: string; name: string; price: number; stock: number }[];
     onSubmit: (bundle: { name: string; items: SKUItem[]; price: number }) => void;
     onCancel: () => void;
+    initialData?: {
+      name: string;
+      price: number;
+      items: { sku: string; quantity: number }[];
+    };
   }
   
-  const CreateBundleForm = ({ availableSKUs, onSubmit, onCancel }: BundleFormProps) => {
+  const CreateBundleForm = ({ availableSKUs, onSubmit, onCancel, initialData }: BundleFormProps) => {
     const [selectedSKU, setSelectedSKU] = useState<string | null>(null);
-    const [bundleName, setBundleName] = useState('');
+    const [bundleName, setBundleName] = useState(initialData?.name || '');
     const [bundleItems, setBundleItems] = useState<SKUItem[]>([]);
-    const [customPrice, setCustomPrice] = useState<number | null>(null);
+    const [customPrice, setCustomPrice] = useState<number | null>(initialData ? initialData.price : null);  
   
     const skuOptions: SKUOption[] = useMemo(
       () =>
@@ -40,7 +45,25 @@ import {
       [availableSKUs]
     );
     
-    
+// inside CreateBundleForm component
+  useEffect(() => {
+    if (initialData && availableSKUs.length > 0) {
+      const loadedItems = initialData.items.map(item => {
+        const matchedSKU = availableSKUs.find(p => p.sku === item.sku);
+
+        return {
+          sku: item.sku,
+          name: matchedSKU?.name || '',
+          price: matchedSKU?.price || 0,
+          quantity: item.quantity,
+          stock: matchedSKU?.stock || 0,
+        };
+      });
+
+      setBundleItems(loadedItems);
+    }
+  }, [initialData, availableSKUs]);
+
   
     const handleAddSKU = () => {
       if (!selectedSKU) return;
@@ -74,6 +97,8 @@ import {
       [bundleItems]
     );
   
+    const submitButtonLabel = initialData ? 'Update Bundle' : 'Save Bundle';
+
     return (
       <Panel header="Create New Bundle">
         <FormGroup>
@@ -187,11 +212,11 @@ import {
               onSubmit({
                 name: bundleName,
                 items: bundleItems,
-                price: customPrice !== null ? customPrice : totalPrice, // ✅ send price too
+                price: customPrice !== null ? customPrice : totalPrice,
               })
             }
           >
-            Save Bundle
+            {submitButtonLabel}
           </Button>
 
         </Box>
