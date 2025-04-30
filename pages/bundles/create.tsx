@@ -1,9 +1,9 @@
 import { Box, H1, Panel, Text } from '@bigcommerce/big-design';
-import Loading from '../../components/loading';
-import ErrorMessage from '../../components/error';
-import CreateBundleForm from '../../components/createBundleForm';
-import { useProductList } from '../../lib/hooks';
 import { useRouter } from 'next/router';
+import CreateBundleForm from '../../components/createBundleForm';
+import ErrorMessage from '../../components/error';
+import Loading from '../../components/loading';
+import { useProductList } from '../../lib/hooks';
 
 const BundlesCreatePage = () => {
   const router = useRouter();

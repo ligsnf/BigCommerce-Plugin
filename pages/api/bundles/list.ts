@@ -1,6 +1,5 @@
-// pages/api/bundles/list.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
 import mysql from 'mysql2/promise';
+import type { NextApiRequest, NextApiResponse } from 'next';
 
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST,

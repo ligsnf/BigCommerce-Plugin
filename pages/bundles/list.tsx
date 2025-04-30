@@ -1,10 +1,9 @@
-import { Box, H1, Panel, Table, Text, Button } from '@bigcommerce/big-design';
+import { Box, Button, Dropdown, H1, Panel, Table , Text } from '@bigcommerce/big-design';
+import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import Loading from '../../components/loading';
 import ErrorMessage from '../../components/error';
-import { Dropdown } from '@bigcommerce/big-design';
-import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
+import Loading from '../../components/loading';
 
 const BundlesListPage = () => {
   const [bundles, setBundles] = useState([]);

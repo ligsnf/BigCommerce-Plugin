@@ -1,9 +1,9 @@
 import { Box, H1, Panel, Text } from '@bigcommerce/big-design';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import Loading from '../../../components/loading';
-import ErrorMessage from '../../../components/error';
 import CreateBundleForm from '../../../components/createBundleForm';
+import ErrorMessage from '../../../components/error';
+import Loading from '../../../components/loading';
 
 const EditBundlePage = () => {
   const router = useRouter();
