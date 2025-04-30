@@ -34,6 +34,15 @@ const BundlesListPage = () => {
       console.error(err);
     }
   };
+
+  const renderName = ({ id, name }) => (
+    <Button
+      variant="subtle"
+      onClick={() => router.push(`/bundles/${id}`)}
+    >
+      {name}
+    </Button>
+  );
   
   useEffect(() => {
     const fetchBundles = async () => {
@@ -69,7 +78,7 @@ const BundlesListPage = () => {
       {bundles.length > 0 ? (
         <Table
         columns={[
-          { header: 'Name', hash: 'name', render: ({ name }) => <Text>{name}</Text> },
+          { header: 'Name', hash: 'name', render: renderName },,
           { header: 'Price', hash: 'price', render: ({ price }) => <Text>${price}</Text> },
           {
             header: 'Action',
