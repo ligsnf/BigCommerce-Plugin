@@ -1,9 +1,10 @@
-import { Box, H1, Panel, Text } from '@bigcommerce/big-design';
+import { AlertProps, Box, H1, Panel, Text } from '@bigcommerce/big-design';
 import { useRouter } from 'next/router';
 import CreateBundleForm from '../../components/createBundleForm';
 import ErrorMessage from '../../components/error';
 import Loading from '../../components/loading';
 import { useProductList } from '../../lib/hooks';
+import { alertsManager } from '../../pages/_app';
 
 const BundlesCreatePage = () => {
   const router = useRouter();
@@ -26,10 +27,20 @@ const BundlesCreatePage = () => {
     const data = await res.json();
 
     if (res.ok) {
-      alert('✅ Bundle saved successfully!');
+      const alert: AlertProps = {
+        messages: [{text: 'Bundle saved successfully!'}],
+        type: 'success',
+        onClose: () => null,
+      };
+      alertsManager.add(alert);
       router.push('/bundles/list'); // Redirect after saving
     } else {
-      alert(`❌ Failed to save bundle: ${data.message}`);
+      const alert: AlertProps = {
+        messages: [{text: `Failed to save bundle: ${data.message}`}],
+        type: 'error',
+        onClose: () => null,
+      };
+      alertsManager.add(alert);
     }
   };
 

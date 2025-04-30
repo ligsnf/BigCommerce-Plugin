@@ -1,9 +1,10 @@
-import { Box, Button, Dropdown, H1, Panel, Table, Text } from '@bigcommerce/big-design';
+import { AlertProps, Box, Button, Dropdown, H1, Panel, Table, Text } from '@bigcommerce/big-design';
 import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import ErrorMessage from '../../components/error';
 import Loading from '../../components/loading';
+import { alertsManager } from '../../pages/_app';
 
 const BundlesListPage = () => {
   const [bundles, setBundles] = useState([]);
@@ -22,14 +23,29 @@ const BundlesListPage = () => {
       });
 
       if (res.ok) {
-        alert('✅ Bundle deleted successfully!');
+        const alert: AlertProps = {
+          messages: [{text: 'Bundle deleted successfully!'}],
+          type: 'success',
+          onClose: () => null,
+        };
+        alertsManager.add(alert);
         router.reload(); // Refresh the list
       } else {
         const data = await res.json();
-        alert(`❌ Failed to delete bundle: ${data.message}`);
+        const alert: AlertProps = {
+          messages: [{text: `Failed to delete bundle: ${data.message}`}],
+          type: 'error',
+          onClose: () => null,
+        };
+        alertsManager.add(alert);
       }
     } catch (err) {
-      alert('❌ An error occurred while deleting the bundle.');
+      const alert: AlertProps = {
+        messages: [{text: 'An error occurred while deleting the bundle.'}],
+        type: 'error',
+        onClose: () => null,
+      };
+      alertsManager.add(alert);
       console.error(err);
     }
   };

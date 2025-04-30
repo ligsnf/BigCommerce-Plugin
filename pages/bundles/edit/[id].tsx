@@ -1,9 +1,10 @@
-import { Box, H1, Panel, Text } from '@bigcommerce/big-design';
+import { AlertProps, Box, H1, Panel, Text } from '@bigcommerce/big-design';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import CreateBundleForm from '../../../components/createBundleForm';
 import ErrorMessage from '../../../components/error';
 import Loading from '../../../components/loading';
+import { alertsManager } from '../../_app';
 
 const EditBundlePage = () => {
   const router = useRouter();
@@ -47,11 +48,21 @@ const EditBundlePage = () => {
     });
 
     if (res.ok) {
-      alert('✅ Bundle updated successfully!');
+      const alert: AlertProps = {
+        messages: [{text: 'Bundle updated successfully!'}],
+        type: 'success',
+        onClose: () => null,
+      };
+      alertsManager.add(alert);
       router.push('/bundles/list');
     } else {
       const data = await res.json();
-      alert(`❌ Failed to update bundle: ${data.message}`);
+      const alert: AlertProps = {
+        messages: [{text:`Failed to update bundle: ${data.message}`}],
+        type: 'success',
+        onClose: () => null,
+      };
+      alertsManager.add(alert);
     }
   };
 
