@@ -15,8 +15,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const [rows] = await pool.query('SELECT id, name, price FROM bundles');
-    res.status(200).json({ bundles: rows });
+    const [bundles] = await pool.query(`
+      SELECT 
+        b.id, 
+        b.name, 
+        b.price,
+        GROUP_CONCAT(p.sku SEPARATOR ', ') as skus
+      FROM 
+        bundles b
+      LEFT JOIN 
+        bundle_items bi ON b.id = bi.bundle_id
+      LEFT JOIN 
+        products p ON bi.product_id = p.id
+      GROUP BY 
+        b.id
+      ORDER BY 
+        b.name
+    `);
+    res.status(200).json({ bundles });
   } catch (err) {
     console.error('[API Bundles List Error]', err);
     res.status(500).json({ message: 'Error fetching bundles', error: err.message });

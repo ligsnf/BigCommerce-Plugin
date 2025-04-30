@@ -1,4 +1,4 @@
-import { Box, Button, Dropdown, H1, Panel, Table , Text } from '@bigcommerce/big-design';
+import { Box, Button, Dropdown, H1, Panel, Table, Text } from '@bigcommerce/big-design';
 import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
@@ -15,12 +15,12 @@ const BundlesListPage = () => {
     if (!confirm('Are you sure you want to delete this bundle?')) {
       return;
     }
-  
+
     try {
       const res = await fetch(`/api/bundles/${id}`, {
         method: 'DELETE',
       });
-  
+
       if (res.ok) {
         alert('✅ Bundle deleted successfully!');
         router.reload(); // Refresh the list
@@ -33,7 +33,7 @@ const BundlesListPage = () => {
       console.error(err);
     }
   };
-  
+
   useEffect(() => {
     const fetchBundles = async () => {
       try {
@@ -55,40 +55,43 @@ const BundlesListPage = () => {
 
   return (
     <Panel>
-    <Box marginBottom="large">
+      <Box marginBottom="large">
         <H1>All Saved Bundles</H1>
-    </Box>
-    <Box marginBottom="medium">
+      </Box>
+      <Box marginBottom="medium">
         <Button onClick={() => router.push('/bundles/create')}>
-            Create New Bundle
+          Create New Bundle
         </Button>
-    </Box>
-
-
+      </Box>
       {bundles.length > 0 ? (
         <Table
-        columns={[
-          { header: 'Name', hash: 'name', render: ({ name }) => <Text>{name}</Text> },
-          { header: 'Price', hash: 'price', render: ({ price }) => <Text>${price}</Text> },
-          {
-            header: 'Action',
-            hideHeader: true,
-            hash: 'id',
-            render: ({ id }) => (
-              <Dropdown
-                toggle={<Button iconOnly={<MoreHorizIcon color="secondary60" />} variant="subtle" />}
-                items={[
-                  { content: 'Edit', onItemClick: () => router.push(`/bundles/edit/${id}`) },
-                  { content: 'Delete', onItemClick: () => handleDelete(id), color: 'danger' },
-                ]}
-              />
-            ),
-          } 
-        ]}
-        items={bundles}
-        itemName="Bundle"
-        stickyHeader
-      />
+          columns={[
+            { header: 'Name', hash: 'name', render: ({ name }) => <Text>{name}</Text> },
+            {
+              header: 'SKUs',
+              hash: 'skus',
+              render: ({ skus }) => <Text>{skus || 'No SKUs'}</Text>
+            },
+            { header: 'Price', hash: 'price', render: ({ price }) => <Text>${price}</Text> },
+            {
+              header: 'Action',
+              hideHeader: true,
+              hash: 'id',
+              render: ({ id }) => (
+                <Dropdown
+                  toggle={<Button iconOnly={<MoreHorizIcon color="secondary60" />} variant="subtle" />}
+                  items={[
+                    { content: 'Edit', onItemClick: () => router.push(`/bundles/edit/${id}`) },
+                    { content: 'Delete', onItemClick: () => handleDelete(id), color: 'danger' },
+                  ]}
+                />
+              ),
+            }
+          ]}
+          items={bundles}
+          itemName="Bundle"
+          stickyHeader
+        />
       ) : (
         <Text>No bundles found.</Text>
       )}
