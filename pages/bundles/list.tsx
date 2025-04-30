@@ -91,7 +91,12 @@ const BundlesListPage = () => {
       {bundles.length > 0 ? (
         <Table
         columns={[
-          { header: 'Name', hash: 'name', render: renderName },,
+          { header: 'Name', hash: 'name', render: renderName },
+          {
+            header: 'SKUs',
+            hash: 'skus',
+            render: ({ skus }) => <Text>{skus || 'No SKUs'}</Text>
+          },
           { header: 'Price', hash: 'price', render: ({ price }) => <Text>${price}</Text> },
           {
             header: 'Action',

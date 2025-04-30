@@ -1,9 +1,8 @@
-import { Box, H1, Panel, Table, Text, Button } from '@bigcommerce/big-design';
+import { Box, Button, H1, Panel, Table, TableSortDirection , Text } from '@bigcommerce/big-design';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import Loading from '../../components/loading';
 import ErrorMessage from '../../components/error';
-import { TableSortDirection } from '@bigcommerce/big-design';
+import Loading from '../../components/loading';
 
 const BundleDetailsPage = () => {
   const router = useRouter();
@@ -70,6 +69,7 @@ const BundleDetailsPage = () => {
           
             if (aValue < bValue) return direction === 'ASC' ? -1 : 1;
             if (aValue > bValue) return direction === 'ASC' ? 1 : -1;
+
             return 0;
           })}          
         itemName="SKU"
