@@ -1,10 +1,9 @@
-import { Box, H1, Panel, Table, Text, Button } from '@bigcommerce/big-design';
+import { Box, Button, Dropdown, H1, Panel, Table, Text } from '@bigcommerce/big-design';
+import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import Loading from '../../components/loading';
 import ErrorMessage from '../../components/error';
-import { Dropdown } from '@bigcommerce/big-design';
-import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
+import Loading from '../../components/loading';
 
 const BundlesListPage = () => {
   const [bundles, setBundles] = useState([]);
@@ -16,12 +15,12 @@ const BundlesListPage = () => {
     if (!confirm('Are you sure you want to delete this bundle?')) {
       return;
     }
-  
+
     try {
       const res = await fetch(`/api/bundles/${id}`, {
         method: 'DELETE',
       });
-  
+
       if (res.ok) {
         alert('✅ Bundle deleted successfully!');
         router.reload(); // Refresh the list
@@ -65,16 +64,14 @@ const BundlesListPage = () => {
 
   return (
     <Panel>
-    <Box marginBottom="large">
+      <Box marginBottom="large">
         <H1>All Saved Bundles</H1>
-    </Box>
-    <Box marginBottom="medium">
+      </Box>
+      <Box marginBottom="medium">
         <Button onClick={() => router.push('/bundles/create')}>
-            Create New Bundle
+          Create New Bundle
         </Button>
-    </Box>
-
-
+      </Box>
       {bundles.length > 0 ? (
         <Table
         columns={[

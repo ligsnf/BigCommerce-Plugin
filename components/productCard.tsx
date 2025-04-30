@@ -19,11 +19,11 @@ const ProductCard = ({ bundleName, products, onClick }: ProductCardProps) => {
   const minStock = Math.min(...products.map(p => p.stock));
 
   return (
-    <StyledBox border="box" padding="medium" onClick={onClick}>
+    <StyledBox border="box" borderRadius="normal" padding="medium" onClick={onClick}>
       <H4 marginBottom="xxSmall">{bundleName}</H4>
-      <Text><Small>SKUs:</Small> {products.map(p => p.sku).join(', ')}</Text>
-      <Text><Small>Available Stock:</Small> {minStock}</Text>
-      <Text><Small>Total Price:</Small> ${totalPrice.toFixed(2)}</Text>
+      <Text as="span"><Small>SKUs:</Small> {products.map(p => p.sku).join(', ')}</Text>
+      <Text as="span"><Small>Available Stock:</Small> {minStock}</Text>
+      <Text as="span"><Small>Total Price:</Small> ${totalPrice.toFixed(2)}</Text>
     </StyledBox>
   );
 };
