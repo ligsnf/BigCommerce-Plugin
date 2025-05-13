@@ -100,3 +100,48 @@ export async function logoutUser({ storeHash, user }: SessionContextProps) {
     const session = { context: `store/${storeHash}`, user };
     await db.deleteUser(session);
 }
+
+export async function registerAppExtension(accessToken: string, storeHash: string) {
+    try {
+      const response = await fetch(
+        `https://api.bigcommerce.com/stores/${storeHash}/v3/apps/extensions`,
+        {
+          method: 'PUT',
+          headers: {
+            'X-Auth-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            extensions: [
+              {
+                id: 'bundle-manager-extension',
+                title: 'Bundle Manager',
+                description: 'Manage product bundles',
+                icon: {
+                  type: 'fontAwesome',
+                  name: 'boxes',
+                },
+                page: 'products',
+                placement: 'tab',
+                features: ['products'],
+                resourceUrl: `${process.env.APP_URL}/productAppExtension/bundle-manager`,
+              },
+            ],
+          }),
+        }
+      );
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Failed to register app extension:', errorData);
+
+        return false;
+      }
+  
+      return true;
+    } catch (error) {
+      console.error('Error registering app extension:', error);
+
+      return false;
+    }
+  }
