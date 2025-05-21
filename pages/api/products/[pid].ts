@@ -14,8 +14,12 @@ export default async function products(req: NextApiRequest, res: NextApiResponse
                 const { accessToken, storeHash } = await getSession(req);
                 const bigcommerce = bigcommerceClient(accessToken, storeHash);
 
-                const { data } = await bigcommerce.get(`/catalog/products/${pid}`);
-                res.status(200).json(data);
+                // Get product data with variants included
+                const { data: product } = await bigcommerce.get(`/catalog/products/${pid}?include=variants`);
+                
+                console.log('Product data:', JSON.stringify(product, null, 2));
+
+                res.status(200).json(product);
             } catch (error) {
                 const { message, response } = error;
                 res.status(response?.status || 500).json({ message });
@@ -27,6 +31,7 @@ export default async function products(req: NextApiRequest, res: NextApiResponse
                 const bigcommerce = bigcommerceClient(accessToken, storeHash);
 
                 const { data } = await bigcommerce.put(`/catalog/products/${pid}`, body);
+                console.log(data);
                 res.status(200).json(data);
             } catch (error) {
                 const { message, response } = error;
@@ -37,6 +42,4 @@ export default async function products(req: NextApiRequest, res: NextApiResponse
             res.setHeader('Allow', ['GET', 'PUT']);
             res.status(405).end(`Method ${method} Not Allowed`);
     }
-
-
 }
