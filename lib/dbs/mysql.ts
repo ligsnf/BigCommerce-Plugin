@@ -16,6 +16,8 @@ const dbUrl = process.env.DATABASE_URL;
 const pool = dbUrl ? mysql.createPool(dbUrl) : mysql.createPool(MYSQL_CONFIG);
 const query = promisify(pool.query.bind(pool));
 
+export { query };
+
 // Use setUser for storing global user data (persists between installs)
 export async function setUser({ user }: SessionProps) {
     if (!user) return null;
