@@ -122,9 +122,9 @@ async function syncProductsFromBigCommerce() {
     }
 
     console.log(`[DB] ✅ Synced ${data.data.length} products from BigCommerce.`);
-  } catch (error) {
-    console.error('[DB] ❌ Error syncing products:', error.message);
-  }
+} catch (error) {
+    console.error('[DB] ❌ Error syncing products:', error.response?.data || error.message);
+  }  
 }
 
 (async () => {

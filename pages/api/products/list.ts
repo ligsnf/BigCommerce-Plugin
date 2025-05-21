@@ -7,7 +7,12 @@ export default async function list(req: NextApiRequest, res: NextApiResponse) {
         const { accessToken, storeHash } = await getSession(req);
         const bigcommerce = bigcommerceClient(accessToken, storeHash);
         const { page, limit, sort, direction } = req.query;
-        const params = new URLSearchParams({ page, limit, ...(sort && {sort, direction}) }).toString();
+        const params = new URLSearchParams({ 
+            page, 
+            limit, 
+            ...(sort && {sort, direction}),
+            include: 'variants'
+        }).toString();
 
         const response = await bigcommerce.get(`/catalog/products?${params}`);
         res.status(200).json(response);

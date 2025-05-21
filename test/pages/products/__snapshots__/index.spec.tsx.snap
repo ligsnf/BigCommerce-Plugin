@@ -2,54 +2,54 @@
 
 exports[`Product List renders correctly 1`] = `
 <div
-  class="styled__StyledBox-sc-sj5f1m-0 dnUGcK styled__StyledPanel-sc-1h6ef3q-0 frQUTZ"
+  class="styled__StyledBox-sc-sj5f1m-0 ddRoJX styled__StyledPanel-sc-1h6ef3q-0 RJZJk"
   id="products"
 >
   <div
     aria-controls=":r0:"
-    class="styled__StyledFlex-sc-yxkzj0-0 lkjaFf"
+    class="styled__StyledFlex-sc-yxkzj0-0 iBfqBu"
   >
     <div
-      class="styled__StyledBox-sc-sj5f1m-0 bTHfrb styled__StyledFlexItem-sc-smjqtt-0 jjUmhN"
+      class="styled__StyledBox-sc-sj5f1m-0 cWmZxi styled__StyledFlexItem-sc-smjqtt-0 cNVUGs"
     >
       <p
-        class="styled__StyledText-sc-tqnj75-5 bOpipu"
+        class="styled__StyledText-sc-tqnj75-5 bnKFFL"
       >
         5 Products
       </p>
     </div>
     <div
-      class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlexItem-sc-smjqtt-0 jjUmhN styled__StyledPaginationContainer-sc-1w0s9nk-0 gaoYmA"
+      class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledFlexItem-sc-smjqtt-0 cNVUGs styled__StyledPaginationContainer-sc-1w0s9nk-0 fEkxvx"
     >
       <div
         aria-label="pagination"
-        class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 dzErNZ"
+        class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledFlex-sc-hcvk8l-0 dEoXps"
         role="navigation"
       >
         <div
-          class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlexItem-sc-smjqtt-0 gMwCkk"
+          class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledFlexItem-sc-smjqtt-0 jwhrgR"
         >
           <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledBox-sc-2535c9-0 eIBwbO"
+            class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledBox-sc-2535c9-0 kSUzcL"
           >
             <button
               aria-activedescendant=""
               aria-controls=":r1:-menu"
               aria-expanded="false"
               aria-haspopup="menu"
-              class="styled__StyledButton-sc-3yq204-0 htmsKm styled__StyledButton-sc-12shuvi-0 bZClQx"
+              class="styled__StyledButton-sc-3yq204-0 dRDWiD styled__StyledButton-sc-12shuvi-0 bdkaIM"
               id=":r1:-toggle-button"
               role="button"
               tabindex="0"
               type="button"
             >
               <span
-                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+                class="styled__ContentWrapper-sc-3yq204-1 bLWcGS"
               >
                 1 - 5 of 5
                 <svg
                   aria-hidden="true"
-                  class="base__StyledIcon-sc-a9u0e1-0 hNTNsv"
+                  class="base__StyledIcon-sc-a9u0e1-0 gWUtem"
                   fill="currentColor"
                   height="24"
                   stroke="currentColor"
@@ -68,12 +68,12 @@ exports[`Product List renders correctly 1`] = `
               </span>
             </button>
             <div
-              class="styled__StyledBox-sc-sj5f1m-0 epYaKJ"
+              class="styled__StyledBox-sc-sj5f1m-0 fDrCGs"
               style="position: fixed; left: 0px; top: 0px; transform: translate(0px, 4px);"
             >
               <ul
                 aria-labelledby=":r1:-label"
-                class="styled__StyledList-sc-5w3dcq-0 bEnmuC"
+                class="styled__StyledList-sc-5w3dcq-0 gGYksL"
                 id=":r1:-menu"
                 role="menu"
                 tabindex="-1"
@@ -82,19 +82,19 @@ exports[`Product List renders correctly 1`] = `
           </div>
         </div>
         <div
-          class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlexItem-sc-smjqtt-0 gMwCkk"
+          class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledFlexItem-sc-smjqtt-0 jwhrgR"
         >
           <button
-            class="styled__StyledButton-sc-3yq204-0 gcxeQP styled__StyledButton-sc-12shuvi-0 bZClQx"
+            class="styled__StyledButton-sc-3yq204-0 easRXS styled__StyledButton-sc-12shuvi-0 bdkaIM"
             disabled=""
             type="button"
           >
             <span
-              class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+              class="styled__ContentWrapper-sc-3yq204-1 bLWcGS"
             >
               <svg
                 aria-labelledby=":r3:"
-                class="base__StyledIcon-sc-a9u0e1-0 brjSIf"
+                class="base__StyledIcon-sc-a9u0e1-0 iUZjCm"
                 fill="currentColor"
                 height="24"
                 stroke="currentColor"
@@ -118,16 +118,16 @@ exports[`Product List renders correctly 1`] = `
             </span>
           </button>
           <button
-            class="styled__StyledButton-sc-3yq204-0 gcxeQP styled__StyledButton-sc-12shuvi-0 bZClQx"
+            class="styled__StyledButton-sc-3yq204-0 easRXS styled__StyledButton-sc-12shuvi-0 bdkaIM"
             disabled=""
             type="button"
           >
             <span
-              class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+              class="styled__ContentWrapper-sc-3yq204-1 bLWcGS"
             >
               <svg
                 aria-labelledby=":r4:"
-                class="base__StyledIcon-sc-a9u0e1-0 brjSIf"
+                class="base__StyledIcon-sc-a9u0e1-0 iUZjCm"
                 fill="currentColor"
                 height="24"
                 stroke="currentColor"
@@ -155,7 +155,7 @@ exports[`Product List renders correctly 1`] = `
     </div>
   </div>
   <table
-    class="styled__StyledTable-sc-xns2ns-1 kbgftC"
+    class="styled__StyledTable-sc-xns2ns-1 jDSVQr"
     id=":r0:"
   >
     <thead
@@ -163,41 +163,41 @@ exports[`Product List renders correctly 1`] = `
     >
       <tr>
         <th
-          class="styled__StyledTableHeaderCell-sc-1opnvtt-0 ljTCUO"
+          class="styled__StyledTableHeaderCell-sc-1opnvtt-0 kcTQMj"
           id="header-cell-0"
         >
           <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 eYuALN styled__StyledFlex-sc-1opnvtt-2 kXIdGS"
+            class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledFlex-sc-hcvk8l-0 hDRTcY styled__StyledFlex-sc-1opnvtt-2 goSqTz"
           >
             Product name
           </div>
         </th>
         <th
-          class="styled__StyledTableHeaderCell-sc-1opnvtt-0 ljTCUO"
+          class="styled__StyledTableHeaderCell-sc-1opnvtt-0 kcTQMj"
           id="header-cell-1"
         >
           <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 eYuALN styled__StyledFlex-sc-1opnvtt-2 kXIdGS"
+            class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledFlex-sc-hcvk8l-0 hDRTcY styled__StyledFlex-sc-1opnvtt-2 goSqTz"
           >
             Stock
           </div>
         </th>
         <th
-          class="styled__StyledTableHeaderCell-sc-1opnvtt-0 ljTCUO"
+          class="styled__StyledTableHeaderCell-sc-1opnvtt-0 kcTQMj"
           id="header-cell-2"
         >
           <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 eYuALN styled__StyledFlex-sc-1opnvtt-2 kXIdGS"
+            class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledFlex-sc-hcvk8l-0 hDRTcY styled__StyledFlex-sc-1opnvtt-2 goSqTz"
           >
             Price
           </div>
         </th>
         <th
-          class="styled__StyledTableHeaderCell-sc-1opnvtt-0 cDEKvS"
+          class="styled__StyledTableHeaderCell-sc-1opnvtt-0 kBSYDT"
           id="header-cell-3"
         >
           <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 eYuALN styled__StyledFlex-sc-1opnvtt-2 jnetuN"
+            class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledFlex-sc-hcvk8l-0 hDRTcY styled__StyledFlex-sc-1opnvtt-2 muWbY"
           >
             Action
           </div>
@@ -208,58 +208,54 @@ exports[`Product List renders correctly 1`] = `
       class="styled__StyledTableBody-sc-1bwe2hn-0"
     >
       <tr
-        class="styled__StyledTableRow-sc-xq0hr0-0 iXHitD"
+        class="styled__StyledTableRow-sc-xq0hr0-0 hgtzoq"
       >
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <a
-            href="/products/0"
+            class="styled__StyledLink-sc-n9mww9-0 jUqmrJ"
           >
-            <a
-              class="styled__StyledLink-sc-n9mww9-0 haEQqw"
-            >
-              Product 0
-            </a>
+            Product 0
           </a>
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <p
-            class="styled__StyledSmall-sc-tqnj75-6 hpuiwL"
+            class="styled__StyledSmall-sc-tqnj75-6 ljJUTy"
             color="danger"
           >
             0
           </p>
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           $10.00
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledBox-sc-2535c9-0 eIBwbO"
+            class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledBox-sc-2535c9-0 kSUzcL"
           >
             <button
               aria-activedescendant=""
               aria-controls=":r9:-menu"
               aria-expanded="false"
               aria-haspopup="menu"
-              class="styled__StyledButton-sc-3yq204-0 gcxeQP bd-button"
+              class="styled__StyledButton-sc-3yq204-0 easRXS bd-button"
               id=":r9:-toggle-button"
               role="button"
               tabindex="0"
             >
               <span
-                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+                class="styled__ContentWrapper-sc-3yq204-1 bLWcGS"
               >
                 <svg
                   aria-hidden="true"
-                  class="base__StyledIcon-sc-a9u0e1-0 PHcub"
+                  class="base__StyledIcon-sc-a9u0e1-0 becPjm"
                   color="secondary60"
                   fill="currentColor"
                   height="24"
@@ -279,12 +275,12 @@ exports[`Product List renders correctly 1`] = `
               </span>
             </button>
             <div
-              class="styled__StyledBox-sc-sj5f1m-0 epYaKJ"
+              class="styled__StyledBox-sc-sj5f1m-0 fDrCGs"
               style="position: absolute; left: 0px; top: 0px;"
             >
               <ul
                 aria-labelledby=":r9:-label"
-                class="styled__StyledList-sc-5w3dcq-0 bEnmuC"
+                class="styled__StyledList-sc-5w3dcq-0 gGYksL"
                 id=":r9:-menu"
                 role="menu"
                 tabindex="-1"
@@ -294,58 +290,54 @@ exports[`Product List renders correctly 1`] = `
         </td>
       </tr>
       <tr
-        class="styled__StyledTableRow-sc-xq0hr0-0 iXHitD"
+        class="styled__StyledTableRow-sc-xq0hr0-0 hgtzoq"
       >
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <a
-            href="/products/1"
+            class="styled__StyledLink-sc-n9mww9-0 jUqmrJ"
           >
-            <a
-              class="styled__StyledLink-sc-n9mww9-0 haEQqw"
-            >
-              Product 1
-            </a>
+            Product 1
           </a>
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <p
-            class="styled__StyledSmall-sc-tqnj75-6 hpuiwL"
+            class="styled__StyledSmall-sc-tqnj75-6 ljJUTy"
             color="danger"
           >
             0
           </p>
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           $20.00
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledBox-sc-2535c9-0 eIBwbO"
+            class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledBox-sc-2535c9-0 kSUzcL"
           >
             <button
               aria-activedescendant=""
               aria-controls=":rb:-menu"
               aria-expanded="false"
               aria-haspopup="menu"
-              class="styled__StyledButton-sc-3yq204-0 gcxeQP bd-button"
+              class="styled__StyledButton-sc-3yq204-0 easRXS bd-button"
               id=":rb:-toggle-button"
               role="button"
               tabindex="0"
             >
               <span
-                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+                class="styled__ContentWrapper-sc-3yq204-1 bLWcGS"
               >
                 <svg
                   aria-hidden="true"
-                  class="base__StyledIcon-sc-a9u0e1-0 PHcub"
+                  class="base__StyledIcon-sc-a9u0e1-0 becPjm"
                   color="secondary60"
                   fill="currentColor"
                   height="24"
@@ -365,12 +357,12 @@ exports[`Product List renders correctly 1`] = `
               </span>
             </button>
             <div
-              class="styled__StyledBox-sc-sj5f1m-0 epYaKJ"
+              class="styled__StyledBox-sc-sj5f1m-0 fDrCGs"
               style="position: absolute; left: 0px; top: 0px;"
             >
               <ul
                 aria-labelledby=":rb:-label"
-                class="styled__StyledList-sc-5w3dcq-0 bEnmuC"
+                class="styled__StyledList-sc-5w3dcq-0 gGYksL"
                 id=":rb:-menu"
                 role="menu"
                 tabindex="-1"
@@ -380,58 +372,54 @@ exports[`Product List renders correctly 1`] = `
         </td>
       </tr>
       <tr
-        class="styled__StyledTableRow-sc-xq0hr0-0 iXHitD"
+        class="styled__StyledTableRow-sc-xq0hr0-0 hgtzoq"
       >
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <a
-            href="/products/2"
+            class="styled__StyledLink-sc-n9mww9-0 jUqmrJ"
           >
-            <a
-              class="styled__StyledLink-sc-n9mww9-0 haEQqw"
-            >
-              Product 2
-            </a>
+            Product 2
           </a>
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <p
-            class="styled__StyledSmall-sc-tqnj75-6 hpuiwL"
+            class="styled__StyledSmall-sc-tqnj75-6 ljJUTy"
             color="danger"
           >
             0
           </p>
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           $30.00
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledBox-sc-2535c9-0 eIBwbO"
+            class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledBox-sc-2535c9-0 kSUzcL"
           >
             <button
               aria-activedescendant=""
               aria-controls=":rd:-menu"
               aria-expanded="false"
               aria-haspopup="menu"
-              class="styled__StyledButton-sc-3yq204-0 gcxeQP bd-button"
+              class="styled__StyledButton-sc-3yq204-0 easRXS bd-button"
               id=":rd:-toggle-button"
               role="button"
               tabindex="0"
             >
               <span
-                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+                class="styled__ContentWrapper-sc-3yq204-1 bLWcGS"
               >
                 <svg
                   aria-hidden="true"
-                  class="base__StyledIcon-sc-a9u0e1-0 PHcub"
+                  class="base__StyledIcon-sc-a9u0e1-0 becPjm"
                   color="secondary60"
                   fill="currentColor"
                   height="24"
@@ -451,12 +439,12 @@ exports[`Product List renders correctly 1`] = `
               </span>
             </button>
             <div
-              class="styled__StyledBox-sc-sj5f1m-0 epYaKJ"
+              class="styled__StyledBox-sc-sj5f1m-0 fDrCGs"
               style="position: absolute; left: 0px; top: 0px;"
             >
               <ul
                 aria-labelledby=":rd:-label"
-                class="styled__StyledList-sc-5w3dcq-0 bEnmuC"
+                class="styled__StyledList-sc-5w3dcq-0 gGYksL"
                 id=":rd:-menu"
                 role="menu"
                 tabindex="-1"
@@ -466,58 +454,54 @@ exports[`Product List renders correctly 1`] = `
         </td>
       </tr>
       <tr
-        class="styled__StyledTableRow-sc-xq0hr0-0 iXHitD"
+        class="styled__StyledTableRow-sc-xq0hr0-0 hgtzoq"
       >
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <a
-            href="/products/3"
+            class="styled__StyledLink-sc-n9mww9-0 jUqmrJ"
           >
-            <a
-              class="styled__StyledLink-sc-n9mww9-0 haEQqw"
-            >
-              Product 3
-            </a>
+            Product 3
           </a>
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <p
-            class="styled__StyledSmall-sc-tqnj75-6 hpuiwL"
+            class="styled__StyledSmall-sc-tqnj75-6 ljJUTy"
             color="danger"
           >
             0
           </p>
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           $40.00
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledBox-sc-2535c9-0 eIBwbO"
+            class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledBox-sc-2535c9-0 kSUzcL"
           >
             <button
               aria-activedescendant=""
               aria-controls=":rf:-menu"
               aria-expanded="false"
               aria-haspopup="menu"
-              class="styled__StyledButton-sc-3yq204-0 gcxeQP bd-button"
+              class="styled__StyledButton-sc-3yq204-0 easRXS bd-button"
               id=":rf:-toggle-button"
               role="button"
               tabindex="0"
             >
               <span
-                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+                class="styled__ContentWrapper-sc-3yq204-1 bLWcGS"
               >
                 <svg
                   aria-hidden="true"
-                  class="base__StyledIcon-sc-a9u0e1-0 PHcub"
+                  class="base__StyledIcon-sc-a9u0e1-0 becPjm"
                   color="secondary60"
                   fill="currentColor"
                   height="24"
@@ -537,12 +521,12 @@ exports[`Product List renders correctly 1`] = `
               </span>
             </button>
             <div
-              class="styled__StyledBox-sc-sj5f1m-0 epYaKJ"
+              class="styled__StyledBox-sc-sj5f1m-0 fDrCGs"
               style="position: absolute; left: 0px; top: 0px;"
             >
               <ul
                 aria-labelledby=":rf:-label"
-                class="styled__StyledList-sc-5w3dcq-0 bEnmuC"
+                class="styled__StyledList-sc-5w3dcq-0 gGYksL"
                 id=":rf:-menu"
                 role="menu"
                 tabindex="-1"
@@ -552,58 +536,54 @@ exports[`Product List renders correctly 1`] = `
         </td>
       </tr>
       <tr
-        class="styled__StyledTableRow-sc-xq0hr0-0 iXHitD"
+        class="styled__StyledTableRow-sc-xq0hr0-0 hgtzoq"
       >
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <a
-            href="/products/4"
+            class="styled__StyledLink-sc-n9mww9-0 jUqmrJ"
           >
-            <a
-              class="styled__StyledLink-sc-n9mww9-0 haEQqw"
-            >
-              Product 4
-            </a>
+            Product 4
           </a>
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <p
-            class="styled__StyledSmall-sc-tqnj75-6 hpuiwL"
+            class="styled__StyledSmall-sc-tqnj75-6 ljJUTy"
             color="danger"
           >
             0
           </p>
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           $50.00
         </td>
         <td
-          class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          class="styled__StyledTableDataCell-sc-16y6nzi-0 kEUlTX"
         >
           <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledBox-sc-2535c9-0 eIBwbO"
+            class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledBox-sc-2535c9-0 kSUzcL"
           >
             <button
               aria-activedescendant=""
               aria-controls=":rh:-menu"
               aria-expanded="false"
               aria-haspopup="menu"
-              class="styled__StyledButton-sc-3yq204-0 gcxeQP bd-button"
+              class="styled__StyledButton-sc-3yq204-0 easRXS bd-button"
               id=":rh:-toggle-button"
               role="button"
               tabindex="0"
             >
               <span
-                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+                class="styled__ContentWrapper-sc-3yq204-1 bLWcGS"
               >
                 <svg
                   aria-hidden="true"
-                  class="base__StyledIcon-sc-a9u0e1-0 PHcub"
+                  class="base__StyledIcon-sc-a9u0e1-0 becPjm"
                   color="secondary60"
                   fill="currentColor"
                   height="24"
@@ -623,12 +603,12 @@ exports[`Product List renders correctly 1`] = `
               </span>
             </button>
             <div
-              class="styled__StyledBox-sc-sj5f1m-0 epYaKJ"
+              class="styled__StyledBox-sc-sj5f1m-0 fDrCGs"
               style="position: absolute; left: 0px; top: 0px;"
             >
               <ul
                 aria-labelledby=":rh:-label"
-                class="styled__StyledList-sc-5w3dcq-0 bEnmuC"
+                class="styled__StyledList-sc-5w3dcq-0 gGYksL"
                 id=":rh:-menu"
                 role="menu"
                 tabindex="-1"

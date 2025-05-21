@@ -57,20 +57,32 @@ export function setSession(session: SessionProps) {
     db.setStoreUser(session);
 }
 
-export async function getSession({ query: { context = '' } }: NextApiRequest) {
-    if (typeof context !== 'string') return;
-    const { context: storeHash, user } = decodePayload(context);
-    const hasUser = await db.hasStoreUser(storeHash, user?.id);
-
-    // Before retrieving session/ hitting APIs, check user
-    if (!hasUser) {
-        throw new Error('User is not available. Please login or ensure you have access permissions.');
+export async function getSession(req: NextApiRequest) {
+    // ✅ Local dev fallback — bypass JWT check
+    if (process.env.NODE_ENV === 'development') {
+      return {
+        accessToken: process.env.ACCESS_TOKEN,
+        storeHash: process.env.STORE_HASH,
+        user: { id: 1, email: 'dev@localhost', username: 'dev' }, // optional dummy user
+      };
     }
-
+  
+    const encodedContext = req.query?.context;
+    if (typeof encodedContext !== 'string') {
+      throw new Error('Context not provided');
+    }
+  
+    const { context: storeHash, user } = decodePayload(encodedContext);
+    const hasUser = await db.hasStoreUser(storeHash, user?.id);
+  
+    if (!hasUser) {
+      throw new Error('User is not available. Please login or ensure you have access permissions.');
+    }
+  
     const accessToken = await db.getStoreToken(storeHash);
-
     return { accessToken, storeHash, user };
-}
+  }
+  
 
 // JWT functions to sign/ verify 'context' query param from /api/auth||load
 export function encodePayload({ user, owner, ...session }: SessionProps) {
