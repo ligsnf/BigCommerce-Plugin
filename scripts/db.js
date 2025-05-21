@@ -69,28 +69,20 @@ async function createTables() {
       sku VARCHAR(100) NOT NULL UNIQUE,
       name VARCHAR(255) NOT NULL,
       stock INT NOT NULL,
-      price DECIMAL(10,2) NOT NULL
+      price DECIMAL(10,2) NOT NULL,
+      is_bundle BOOLEAN DEFAULT FALSE
     );
   `);
 
   // Create bundles table
   await query(`
-    CREATE TABLE IF NOT EXISTS bundles (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      price DECIMAL(10,2) NOT NULL DEFAULT 0
-    );
-  `);
-
-  // Create bundle_items table
-  await query(`
-    CREATE TABLE IF NOT EXISTS bundle_items (
+    CREATE TABLE IF NOT EXISTS bundle_products (
       id INT AUTO_INCREMENT PRIMARY KEY,
       bundle_id INT NOT NULL,
       product_id INT NOT NULL,
-      quantity INT NOT NULL,
-      FOREIGN KEY (bundle_id) REFERENCES bundles(id) ON DELETE CASCADE,
-      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      quantity INT NOT NULL DEFAULT 1,
+      FOREIGN KEY (bundle_id) REFERENCES products(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id)
     );
   `);
 

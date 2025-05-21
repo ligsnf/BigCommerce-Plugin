@@ -1,6 +1,9 @@
-import { Button, Checkbox, Flex, FormGroup, Input, Panel, Select, Form as StyledForm, Textarea } from '@bigcommerce/big-design';
-import { ChangeEvent, FormEvent, useState } from 'react';
+import { Button, Checkbox, Flex, FormGroup, Input, MultiSelect, Panel, Select, Form as StyledForm, Textarea } from '@bigcommerce/big-design';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { useProductList } from '@lib/hooks';
 import { FormData, StringKeyValue } from '../types';
+import ErrorMessage from './error';
+import Loading from './loading';
 
 interface FormProps {
     formData: FormData;
@@ -14,9 +17,33 @@ const FormErrors = {
 };
 
 const Form = ({ formData, onCancel, onSubmit }: FormProps) => {
-    const { description, isVisible, name, price, type } = formData;
-    const [form, setForm] = useState<FormData>({ description, isVisible, name, price, type });
+    const { description, isVisible, name, price, type, components = [] } = formData;
+    const [form, setForm] = useState<FormData>({ description, isVisible, name, price, type, components });
     const [errors, setErrors] = useState<StringKeyValue>({});
+    const [selectedSkus, setSelectedSkus] = useState(components.map(comp => comp.sku));
+    
+    const { list = [], isLoading, error } = useProductList();
+
+    // Format products for MultiSelect
+    const productOptions = list.map(product => ({
+        value: product.sku,
+        content: `${product.name} (SKU: ${product.sku})`
+    }));
+
+    // Update components when selectedSkus changes
+    useEffect(() => {
+        const newComponents = selectedSkus.map(sku => {
+            const product = list.find(p => p.sku === sku);
+
+            return {
+                sku,
+                name: product ? product.name : 'Unknown Product',
+                quantity: 1
+            };
+        });
+        
+        setForm(prevForm => ({ ...prevForm, components: newComponents }));
+    }, [selectedSkus, list]);
 
     const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name: formName, value } = event.target || {};
@@ -26,6 +53,10 @@ const Form = ({ formData, onCancel, onSubmit }: FormProps) => {
         !value && FormErrors[formName]
             ? setErrors(prevErrors => ({ ...prevErrors, [formName]: FormErrors[formName] }))
             : setErrors(({ [formName]: removed, ...prevErrors }) => ({ ...prevErrors }));
+    };
+
+    const handleComponentsChange = (newSelectedSkus) => {
+        setSelectedSkus(newSelectedSkus);
     };
 
     const handleSelectChange = (value: string) => {
@@ -47,6 +78,9 @@ const Form = ({ formData, onCancel, onSubmit }: FormProps) => {
         onSubmit(form);
     };
 
+    if (isLoading) return <Loading />;
+    if (error) return <ErrorMessage error={error} />;
+
     return (
         <StyledForm onSubmit={handleSubmit}>
             <Panel header="Basic Information">
@@ -58,6 +92,15 @@ const Form = ({ formData, onCancel, onSubmit }: FormProps) => {
                         required
                         value={form.name}
                         onChange={handleChange}
+                    />
+                </FormGroup>
+                <FormGroup>
+                    <MultiSelect
+                        label="Bundled SKUs"
+                        options={productOptions}
+                        value={selectedSkus}
+                        onOptionsChange={handleComponentsChange}
+                        placeholder="Search for products to include in this bundle..."
                     />
                 </FormGroup>
                 <FormGroup>
@@ -98,7 +141,6 @@ const Form = ({ formData, onCancel, onSubmit }: FormProps) => {
             </Panel>
             <Panel header="Description">
                 <FormGroup>
-                    {/* Using description for demo purposes. Consider using a wysiwig instead (e.g. TinyMCE) */}
                     <Textarea
                         label="Description"
                         name="description"

@@ -21,9 +21,10 @@ const Products = () => {
       ...(columnHash && { direction: direction.toLowerCase() }),
     });
     const itemsPerPageOptions = [10, 20, 50, 100];
-    const tableItems: TableItem[] = list.map(({ id, inventory_level: stock, name, price }) => ({
+    const tableItems: TableItem[] = list.map(({ id, inventory_level: stock, name, sku, price }) => ({
         id,
         name,
+        sku,
         price,
         stock,
     }));
@@ -42,6 +43,10 @@ const Products = () => {
         <Link href={`/products/${id}`}>
             <StyledLink>{name}</StyledLink>
         </Link>
+    );
+    
+    const renderSku = (sku: string): ReactElement => (
+        <Small>{sku}</Small>
     );
 
     const renderPrice = (price: number): string => (
@@ -68,6 +73,7 @@ const Products = () => {
             <Table
                 columns={[
                     { header: 'Product name', hash: 'name', render: ({ id, name }) => renderName(id, name), isSortable: true },
+                    { header: 'SKU', hash: 'sku', render: ({ sku }) => renderSku(sku), isSortable: true },
                     { header: 'Stock', hash: 'stock', render: ({ stock }) => renderStock(stock), isSortable: true },
                     { header: 'Price', hash: 'price', render: ({ price }) => renderPrice(price), isSortable: true },
                     { header: 'Action', hideHeader: true, hash: 'id', render: ({ id }) => renderAction(id) },

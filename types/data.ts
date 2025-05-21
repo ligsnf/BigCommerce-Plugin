@@ -4,11 +4,17 @@ export interface FormData {
     name: string;
     price: number;
     type: string;
+    components?: Array<{
+        sku: string;
+        name: string;
+        quantity: number;
+    }>;
 }
 
 export interface TableItem {
     id: number;
     name: string;
+    sku: string;
     price: number;
     stock: number;
 }
