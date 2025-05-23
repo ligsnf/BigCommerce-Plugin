@@ -83,6 +83,43 @@ npm run dev
 
 11. Consult our developer documentation to [install and launch the app](https://developer.bigcommerce.com/api-docs/apps/quick-start#install-the-app).
 
+## Registering Webhooks
+
+There are two ways to register webhooks for your app:
+
+### Manual Registration
+
+1. In your BigCommerce store's admin panel, go to **Settings** > **API** > **Webhooks**.
+
+2. Click **Create a Webhook**.
+
+3. Configure the webhook with the following settings:
+   - **Event**: Select the event you want to listen to (e.g., `store/product/*`)
+   - **Destination**: Enter your app's webhook endpoint URL: `https://{your-domain}/api/webhooks`
+   - **Version**: Select the API version you want to use
+   - **Format**: JSON
+
+4. Click **Save** to register the webhook.
+
+### Programmatic Registration
+
+You can register webhooks programmatically using the provided script. Follow these steps:
+
+1. Make sure your app is installed and running.
+
+2. Run the webhook registration script:
+
+```shell
+npm run register-webhooks
+```
+
+This script will:
+- Register the necessary webhook endpoints
+- Configure the webhook settings automatically
+- Set up proper authentication and validation
+
+> Note: Make sure your app's webhook endpoint is publicly accessible and properly configured to handle incoming webhook requests. The webhook endpoint should be secured and validate the webhook signature to ensure the requests are coming from BigCommerce.
+
 ## Production builds
 
 In production, you must build and run optimized version of the code. Use the following commands to get started:
