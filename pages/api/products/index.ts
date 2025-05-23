@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { NextApiRequest, NextApiResponse } from 'next';
 import { bigcommerceClient, getSession } from '../../../lib/auth';
 
@@ -24,7 +25,7 @@ export default async function products(req: NextApiRequest, res: NextApiResponse
           // Use the v3 API endpoint for variants
           const { data: variants } = await bigcommerce.get(`/catalog/products/${p.id}/variants?limit=250`);
           console.log(`Variants for product ${p.id}:`, variants);
-          
+
           return {
             id: p.id,
             name: p.name,
@@ -35,6 +36,7 @@ export default async function products(req: NextApiRequest, res: NextApiResponse
           };
         } catch (error) {
           console.error(`Error fetching variants for product ${p.id}:`, error);
+
           return {
             id: p.id,
             name: p.name,

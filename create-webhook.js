@@ -1,5 +1,6 @@
-require('dotenv').config();
-const axios = require('axios');
+/* eslint-disable no-console */
+import 'dotenv/config';
+import axios from 'axios';
 
 async function createWebhook() {
   const storeHash = process.env.STORE_HASH;

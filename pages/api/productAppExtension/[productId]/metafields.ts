@@ -33,6 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ isBundle, linkedProductIds, productQuantities });
     } catch (err: any) {
       console.error('[GET metafields] Error:', err);
+
       return res.status(500).json({ message: err.message });
     }
   }
@@ -104,6 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
 
           const result = await response.json();
+
           return result;
         })
       );
@@ -111,6 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ message: 'Metafields saved/updated', responses });
     } catch (err: any) {
       console.error('[POST metafields] Error:', err);
+
       return res.status(500).json({ message: err.message });
     }
   }

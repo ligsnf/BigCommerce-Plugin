@@ -7,28 +7,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const bc = bigcommerceClient(process.env.ACCESS_TOKEN!, process.env.STORE_HASH!);
-    
+    if (!process.env.ACCESS_TOKEN || !process.env.STORE_HASH) {
+      throw new Error('Missing required environment variables: ACCESS_TOKEN or STORE_HASH');
+    }
+    const bc = bigcommerceClient(process.env.ACCESS_TOKEN, process.env.STORE_HASH);
+
     // Get all products
     const { data: products } = await bc.get('/catalog/products');
-    
+
     // Get metafields for each product to identify bundles
     const bundles = [];
-    
+
     for (const product of products) {
       const { data: metafields } = await bc.get(`/catalog/products/${product.id}/metafields`);
-      
+
       const isBundle = metafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
-      
+
       if (isBundle) {
         const linkedProductIds = JSON.parse(
           metafields.find(f => f.key === 'linked_product_ids' && f.namespace === 'bundle')?.value || '[]'
         );
-        
+
         const quantities = JSON.parse(
           metafields.find(f => f.key === 'linked_product_quantities' && f.namespace === 'bundle')?.value || '[]'
         );
-        
+
         bundles.push({
           id: product.id,
           name: product.name,
@@ -37,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
     }
-    
+
     res.status(200).json(bundles);
   } catch (error: any) {
     console.error('Error fetching bundles:', error);

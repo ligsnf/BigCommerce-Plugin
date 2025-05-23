@@ -1,9 +1,8 @@
-import { Box, Flex, H1, H4, Panel, Button, Text } from '@bigcommerce/big-design';
-import styled from 'styled-components';
+import { Box, Button, Flex, H4, Panel, Text } from '@bigcommerce/big-design';
+import { BundleQuantities } from '../components/BundleQuantities';
 import ErrorMessage from '../components/error';
 import Loading from '../components/loading';
 import { useBundles } from '../lib/hooks/use-bundles';
-import { BundleQuantities } from '../components/BundleQuantities';
 
 const Index = () => {
     const { bundles, isLoading, error, refetch } = useBundles();
@@ -32,16 +31,16 @@ const Index = () => {
                 </Flex>
 
                 {bundles.map(bundle => (
-                    <Box 
-                        key={bundle.id} 
-                        marginBottom="large" 
-                        border="box" 
-                        borderRadius="normal" 
+                    <Box
+                        key={bundle.id}
+                        marginBottom="large"
+                        border="box"
+                        borderRadius="normal"
                         padding="medium"
                     >
                         <H4>Bundle: {bundle.name}</H4>
                         <Text>ID: {bundle.id}</Text>
-                        
+
                         <BundleQuantities
                             bundleId={bundle.id}
                             linkedProductIds={bundle.linkedProductIds}
@@ -53,9 +52,5 @@ const Index = () => {
         </>
     );
 };
-
-const StyledBox = styled(Box)`
-    min-width: 10rem;
-`;
 
 export default Index;

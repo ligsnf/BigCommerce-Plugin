@@ -1,32 +1,29 @@
+/* eslint-disable no-console */
 import {
-  H4,
-  Panel,
-  Text,
-  Switch,
-  Button,
   Box,
+  Button,
+  H4,
   Input,
-  Flex,
-  Table,
+  Panel,
   Small,
+  Switch,
+  Table,
+  Text,
 } from '@bigcommerce/big-design';
+import { CloseIcon } from '@bigcommerce/big-design-icons';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Select from 'react-select';
 import ErrorMessage from '@components/error';
 import Loading from '@components/loading';
-import { useProductInfo } from '@lib/hooks';
-import { useProductList } from '@lib/hooks';
-import { CloseIcon } from '@bigcommerce/big-design-icons';
+import { useProductInfo, useProductList } from '@lib/hooks';
 
 const ProductAppExtension = () => {
   const router = useRouter();
   const productId = Number(router.query?.productId);
 
   const { error, isLoading, product } = useProductInfo(productId);
-  const { name, type, price, is_visible: isVisible, description } = product ?? {};
-  const typeCapitalized = type?.replace(/^\w/, (c) => c.toUpperCase());
-  const isVisibleString = isVisible ? 'True' : 'False';
+  const { name } = product ?? {};
 
   const [isBundle, setIsBundle] = useState(false);
   const [linkedProducts, setLinkedProducts] = useState([]);
@@ -42,6 +39,7 @@ const ProductAppExtension = () => {
       if (id === productId) return false;
       // Exclude products that are bundles (have BUN- prefix)
       if (sku?.startsWith('BUN-')) return false;
+
       return true;
     })
     .map(({ id, sku, name, price, inventory_level, variants, inventory_tracking }) => {
@@ -95,7 +93,7 @@ const ProductAppExtension = () => {
   // Handle item selection
   const handleItemSelect = (selectedItem) => {
     if (!selectedItem) return;
-    
+
     // For variants, we need to check both the variant and product level
     const product = products.find(p => p.value === selectedItem.productId);
     if (!product) return;
@@ -104,13 +102,14 @@ const ProductAppExtension = () => {
     const hasMultipleVariants = product.variants && product.variants.length > 1;
 
     // Check inventory tracking
-    const hasInventoryTracking = selectedItem.isMainProduct 
+    const hasInventoryTracking = selectedItem.isMainProduct
       ? product.inventory_tracking === "product" // Main product enabled if product tracking
       : hasMultipleVariants && product.inventory_tracking === "variant"; // Variants enabled only if multiple variants with variant tracking
 
     if (!hasInventoryTracking) {
       alert("This product/variant cannot be added to bundles because it has inventory tracking disabled.");
       setSelectedItem(null);
+
       return;
     }
 
@@ -136,11 +135,11 @@ const ProductAppExtension = () => {
   useEffect(() => {
     async function fetchMetafields() {
       if (!productId || products.length === 0) return;
-  
+
       try {
         const res = await fetch(`/api/productAppExtension/${productId}/metafields`);
         const data = await res.json();
-  
+
         if (res.ok) {
           setIsBundle(data.isBundle);
           // First set the quantities to ensure they're available
@@ -157,6 +156,7 @@ const ProductAppExtension = () => {
                   [id]: 1
                 }));
               }
+
               return product;
             })
           );
@@ -167,9 +167,9 @@ const ProductAppExtension = () => {
         console.error('Error fetching metafields:', err);
       }
     }
-  
+
     fetchMetafields();
-  }, [productId, products.length]);
+  }, [productId, products, products.length]);
 
   const handleQuantityChange = (productId, quantity) => {
     setProductQuantities(prev => ({
@@ -212,8 +212,8 @@ const ProductAppExtension = () => {
       }
 
       // Calculate minimum stock level for bundles and prepare update data
-      let updateData: any = {};
-      
+      const updateData: any = {};
+
       // Update SKU if changed
       if (newSku !== currentSku) {
         updateData.sku = newSku;
@@ -227,14 +227,16 @@ const ProductAppExtension = () => {
             const res = await fetch(`/api/products/${p.value}`);
             if (!res.ok) {
               console.warn(`Failed to fetch stock for product ${p.value}`);
+
               return 0;
             }
             const data = await res.json();
+
             // Consider quantity when calculating available bundles
             return Math.floor((data.inventory_level ?? 0) / (productQuantities[p.value] || 1));
           })
         );
-        
+
         const minStock = Math.min(...stockLevels);
         updateData.inventory_level = minStock;
         updateData.inventory_tracking = "product";
@@ -244,7 +246,7 @@ const ProductAppExtension = () => {
         updateData.inventory_tracking = "none";
         updateData.inventory_level = null;
       }
-      
+
       console.log("Updating with data:", updateData);
 
       // Make API call to update product
@@ -294,11 +296,11 @@ const ProductAppExtension = () => {
         {isBundle && (
           <Box marginBottom="medium">
             <H4>Select products and quantities for this bundle</H4>
-            
+
             <Box marginBottom="medium">
               <Select
                 isSearchable
-                options={combinedOptions.filter(option => 
+                options={combinedOptions.filter(option =>
                   // Filter out products that are already linked
                   !linkedProducts.find(lp => lp.selectedSku === option.sku)
                 )}
@@ -309,12 +311,12 @@ const ProductAppExtension = () => {
                 formatOptionLabel={(option) => {
                   const product = products.find(p => p.value === option.productId);
                   const hasMultipleVariants = product?.variants && product.variants.length > 1;
-                  const hasInventoryTracking = option.isMainProduct 
+                  const hasInventoryTracking = option.isMainProduct
                     ? product?.inventory_tracking === "product"
                     : hasMultipleVariants && product?.inventory_tracking === "variant";
 
                   return (
-                    <div style={{ 
+                    <div style={{
                       opacity: hasInventoryTracking ? 1 : 0.5,
                       color: hasInventoryTracking ? "inherit" : "#666"
                     }}>
@@ -332,7 +334,7 @@ const ProductAppExtension = () => {
                 Note: Only products with inventory tracking enabled can be added to bundles.
               </Small>
             </Box>
-            
+
             {/* Bundle Items Table */}
             <Box marginTop="medium">
               {linkedProducts.length > 0 && (
@@ -340,7 +342,7 @@ const ProductAppExtension = () => {
                   columns={[
                     { header: 'Product', hash: 'product', render: ({ label }) => label },
                     { header: 'SKU', hash: 'sku', render: ({ skuLabel }) => skuLabel },
-                    { 
+                    {
                       header: 'Quantity',
                       hash: 'quantity',
                       width: '200px',
@@ -361,9 +363,9 @@ const ProductAppExtension = () => {
                       render: ({ value }) => (
                         <button
                           onClick={() => setLinkedProducts(linkedProducts.filter(p => p.value !== value))}
-                          style={{ 
-                            border: 'none', 
-                            background: 'none', 
+                          style={{
+                            border: 'none',
+                            background: 'none',
                             cursor: 'pointer',
                             padding: '4px',
                             color: '#D92D20'

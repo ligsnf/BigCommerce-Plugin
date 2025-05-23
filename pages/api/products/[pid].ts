@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { NextApiRequest, NextApiResponse } from 'next';
 import { bigcommerceClient, getSession } from '../../../lib/auth';
 
@@ -16,7 +17,7 @@ export default async function products(req: NextApiRequest, res: NextApiResponse
 
                 // Get product data with variants included
                 const { data: product } = await bigcommerce.get(`/catalog/products/${pid}?include=variants`);
-                
+
                 console.log('Product data:', JSON.stringify(product, null, 2));
 
                 res.status(200).json(product);

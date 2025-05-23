@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { bigcommerceClient } from '../../../lib/auth';
 
@@ -13,6 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!order || !storeHash || !accessToken) {
       console.error('❌ Missing order, storeHash, or accessToken');
+
       return res.status(400).json({ message: 'Missing required information' });
     }
 
@@ -36,20 +38,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const orderDetails = await orderProductsRes.json();
-    
+
     // Get all products that are bundles
     const { data: allProducts } = await bc.get('/catalog/products');
     const bundleProducts = [];
-    
+
     // Find all bundles and their details
     for (const product of allProducts) {
       const { data: metafields } = await bc.get(`/catalog/products/${product.id}/metafields`);
       const isBundle = metafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
-      
+
       if (isBundle) {
         const linkedField = metafields.find(f => f.key === 'linked_product_ids' && f.namespace === 'bundle');
         const productQuantitiesField = metafields.find(f => f.key === 'product_quantities' && f.namespace === 'bundle');
-        
+
         if (linkedField && productQuantitiesField) {
           bundleProducts.push({
             id: product.id,
@@ -66,7 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const orderedQuantity = item.quantity;
 
       console.log(`🔍 Processing ordered product ${productId}...`);
-      
+
       // Check if the ordered item is a bundle
       const { data: itemMetafields } = await bc.get(`/catalog/products/${productId}/metafields`);
       const isBundle = itemMetafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
@@ -76,19 +78,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.log(`📦 Product ${productId} is a bundle`);
         const linkedField = itemMetafields.find(f => f.key === 'linked_product_ids' && f.namespace === 'bundle');
         const productQuantitiesField = itemMetafields.find(f => f.key === 'product_quantities' && f.namespace === 'bundle');
-        
+
         if (linkedField && productQuantitiesField) {
           const linkedProductIds = JSON.parse(linkedField.value);
           const productQuantities = JSON.parse(productQuantitiesField.value);
-          
+
           // Update stock for each product in the bundle
           for (const linkedId of linkedProductIds) {
             const quantity = productQuantities[linkedId] || 1;
             const totalQuantity = orderedQuantity * quantity;
-            
+
             const { data: linkedProduct } = await bc.get(`/catalog/products/${linkedId}`);
             const newStock = Math.max(0, linkedProduct.inventory_level - totalQuantity);
-            
+
             console.log(`📉 Reducing stock for bundled product ${linkedId}: ${linkedProduct.inventory_level} → ${newStock}`);
             await bc.put(`/catalog/products/${linkedId}`, {
               inventory_level: newStock
@@ -98,25 +100,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         // Handle individual product purchase - only update affected bundles
         console.log(`📦 Product ${productId} is an individual item`);
-        
+
         // Find and update all bundles that contain this product
-        const affectedBundles = bundleProducts.filter(bundle => 
+        const affectedBundles = bundleProducts.filter(bundle =>
           bundle.linkedProductIds.includes(productId)
         );
-        
+
         console.log(`🔍 Found ${affectedBundles.length} bundles containing product ${productId}`);
-        
+
         for (const bundle of affectedBundles) {
           // Calculate the new maximum possible bundle quantity based on all constituent products
           let minPossibleBundles = Infinity;
-          
+
           for (const linkedId of bundle.linkedProductIds) {
             const { data: linkedProduct } = await bc.get(`/catalog/products/${linkedId}`);
             const quantityNeeded = bundle.productQuantities[linkedId] || 1;
             const possibleBundles = Math.floor(linkedProduct.inventory_level / quantityNeeded);
             minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
           }
-          
+
           console.log(`📊 Updating bundle ${bundle.id} stock to ${minPossibleBundles}`);
           await bc.put(`/catalog/products/${bundle.id}`, {
             inventory_level: minPossibleBundles

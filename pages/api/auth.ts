@@ -14,6 +14,7 @@ export default async function auth(req: NextApiRequest, res: NextApiResponse) {
         const storeHash = context?.split('/')[1] || '';
 
         await setSession(session);
+        // eslint-disable-next-line no-console
         console.log('Session:', session)
 
         /**
@@ -22,9 +23,9 @@ export default async function auth(req: NextApiRequest, res: NextApiResponse) {
          */
 
         if (isAppExtensionsScopeEnabled) {
-            await createAppExtension({accessToken, storeHash})
+            await createAppExtension({ accessToken, storeHash })
         } else {
-          console.warn("WARNING: App extensions scope is not enabled yet. To register app extensions update the scope in Developer Portal: https://devtools.bigcommerce.com");
+            console.warn("WARNING: App extensions scope is not enabled yet. To register app extensions update the scope in Developer Portal: https://devtools.bigcommerce.com");
         }
 
         res.redirect(302, `/?context=${encodedContext}`);

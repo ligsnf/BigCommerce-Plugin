@@ -1,21 +1,19 @@
-import { useState, useEffect } from 'react';
 import {
-  Panel,
+  Box,
+  Button,
   Form,
   FormGroup,
-  Input,
-  Button,
-  Select,
-  Text,
-  Box,
   H1,
   H4,
+  Input,
+  Panel,
+  Select,
   Small,
-  Flex,
+  Text,
 } from '@bigcommerce/big-design';
 import { useRouter } from 'next/router';
-import { bigcommerceClient } from '../../lib/auth';
-import { getSession } from '../../lib/auth';
+import { useState } from 'react';
+import { bigcommerceClient, getSession } from '../../lib/auth';
 
 export const getServerSideProps = async (context) => {
   const { accessToken, storeHash } = await getSession(context.req);
@@ -24,7 +22,7 @@ export const getServerSideProps = async (context) => {
   try {
     // Fetch all products
     const { data: products } = await bc.get('/catalog/products?limit=250');
-    
+
     // Format products for the select dropdown
     const formattedProducts = products.map(product => ({
       value: product.id,
@@ -39,6 +37,7 @@ export const getServerSideProps = async (context) => {
     };
   } catch (error) {
     console.error('Error fetching products:', error);
+
     return {
       props: {
         products: []
@@ -104,8 +103,8 @@ const SimulateSale = ({ products }) => {
               placeholder="Choose a product..."
             />
             <Small>
-              {selectedProduct && products.find(p => p.value === selectedProduct)?.isBundle 
-                ? '📦 This is a bundle product' 
+              {selectedProduct && products.find(p => p.value === selectedProduct)?.isBundle
+                ? '📦 This is a bundle product'
                 : ''}
             </Small>
           </FormGroup>
