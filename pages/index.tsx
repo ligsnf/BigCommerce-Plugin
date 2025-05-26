@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { Box, Flex, H1, Panel, Button, Tabs, Table } from '@bigcommerce/big-design';
 import ErrorMessage from '@components/error';
 import Loading from '@components/loading';
+import { useSession } from '../context/session';
 
 interface Product {
   id: number;
@@ -32,6 +33,18 @@ export default function Home() {
   const [error, setError] = useState<Error | null>(null);
   const [activeTab, setActiveTab] = useState<'products' | 'bundles'>('products');
   const router = useRouter();
+  const { context } = useSession();
+  
+  // Extract store hash from JWT token
+  const storeHash = context ? JSON.parse(atob(context.split('.')[1])).context : null;
+
+  useEffect(() => {
+    console.log('=== Session Debug Info ===');
+    console.log('Raw Context:', context);
+    console.log('Decoded JWT:', context ? JSON.parse(atob(context.split('.')[1])) : null);
+    console.log('Store Hash:', storeHash);
+    console.log('=======================');
+  }, [context]);
 
   useEffect(() => {
     async function fetchData() {
@@ -55,7 +68,11 @@ export default function Home() {
   if (error) return <ErrorMessage error={error} />;
 
   const handleProductClick = (productId: number) => {
-    window.open(`https://store-${process.env.NEXT_PUBLIC_STORE_HASH}.mybigcommerce.com/manage/products/${productId}/edit`, '_blank');
+    console.log('Session Context:', context);
+    console.log('Store Hash:', storeHash);
+    console.log('Product ID:', productId);
+    console.log('Full URL:', `https://store-${storeHash}.mybigcommerce.com/manage/products/${productId}/edit`);
+    window.open(`https://store-${storeHash}.mybigcommerce.com/manage/products/${productId}/edit`, '_blank');
   };
 
   const productColumns = [

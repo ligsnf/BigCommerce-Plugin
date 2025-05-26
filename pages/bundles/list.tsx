@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import ErrorMessage from '../../components/error';
 import Loading from '../../components/loading';
-import { alertsManager } from '../../pages/_app';
+import { alertsManager } from '../../lib/alerts';
 
 const BundlesListPage = () => {
   const [bundles, setBundles] = useState([]);

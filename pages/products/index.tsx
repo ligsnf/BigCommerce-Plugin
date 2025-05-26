@@ -2,11 +2,12 @@ import { Button, Dropdown, Panel, Small, Link as StyledLink, Table, TableSortDir
 import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ReactElement, useState } from 'react';
+import { ReactElement, useState, useEffect } from 'react';
 import ErrorMessage from '../../components/error';
 import Loading from '../../components/loading';
 import { useProductList } from '../../lib/hooks';
 import { TableItem } from '../../types';
+import { useSession } from '../../context/session';
 
 const Products = () => {
     const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -14,6 +15,20 @@ const Products = () => {
     const [columnHash, setColumnHash] = useState('');
     const [direction, setDirection] = useState<TableSortDirection>('ASC');
     const router = useRouter();
+    const { context } = useSession();
+    const storeHash = process.env.NODE_ENV === 'development' 
+        ? process.env.STORE_HASH 
+        : context?.split('/')[1];
+
+    useEffect(() => {
+        // Log to browser console
+        console.log('%c[Products Page]', 'color: #4CAF50; font-weight: bold');
+        console.log('Environment:', process.env.NODE_ENV);
+        console.log('Session Context:', context);
+        console.log('Store Hash:', storeHash);
+        console.log('Full URL:', window.location.href);
+    }, [context, storeHash]);
+
     const { error, isLoading, list = [], meta = {} } = useProductList({
       page: String(currentPage),
       limit: String(itemsPerPage),
@@ -39,9 +54,9 @@ const Products = () => {
     };
 
     const renderName = (id: number, name: string): ReactElement => (
-        <Link href={`/products/${id}`}>
-            <StyledLink>{name}</StyledLink>
-        </Link>
+        <Button variant="subtle" onClick={() => window.open(`https://store-${storeHash}.mybigcommerce.com/manage/products/${id}/edit`, '_blank')}>
+            {name}
+        </Button>
     );
 
     const renderPrice = (price: number): string => (
