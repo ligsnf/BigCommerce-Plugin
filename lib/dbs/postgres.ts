@@ -1,17 +1,13 @@
-import { neon } from '@neondatabase/serverless';
 import { SessionProps } from '../../types';
+import database from '../database.js';
 
-// Neon serverless connection
-const POSTGRES_URL = process.env.POSTGRES_URL;
-if (!POSTGRES_URL) {
-    throw new Error('POSTGRES_URL environment variable is not set');
-}
-const sql = neon(POSTGRES_URL);
+const { sql } = database;
 
 // Helper function to execute queries (keeping the same interface for compatibility)
 async function executeQuery(text: string, params?: any[]) {
-    const result = await sql(text, params || []);
-    
+    // Use the regular query interface that supports both template literals and parameterized queries
+    const result = await sql(text, ...(params || []));
+
     return result;
 }
 
@@ -49,7 +45,7 @@ export async function setStoreUser(session: SessionProps) {
     if (!userId) return null;
     const contextString = context ?? sub;
     const storeHash = contextString?.split('/')[1] || '';
-    
+
     const selectSql = 'SELECT * FROM store_users WHERE user_id = $1 AND store_hash = $2';
     const storeUser = await executeQuery(selectSql, [String(userId), storeHash]);
 
