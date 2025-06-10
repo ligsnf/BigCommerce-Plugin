@@ -9,6 +9,8 @@
     "start": "next start -p $PORT",
     "test": "jest --updateSnapshot",
     "lint": "eslint . --ext .ts,.tsx,.js",
+    "db:start": "docker run --name bigcommerce-db -e MYSQL_ROOT_PASSWORD=mysql -e MYSQL_DATABASE=bigcommerce -e MYSQL_USER=mysql -e MYSQL_PASSWORD=mysql -p 3306:3306 -d mysql:8.0",
+    "db:stop": "docker stop bigcommerce-db && docker rm bigcommerce-db",
     "db:setup": "node scripts/db.js",
     "create-webhook": "node create-webhook.js"
   },

@@ -3,7 +3,7 @@ import { CloseIcon } from '@bigcommerce/big-design-icons';
 
 interface BundleItemsTableProps {
   linkedProducts: any[];
-  productQuantities: Record<number, number>;
+  productQuantities: Record<string, number>;
   onQuantityChange: (productId: number, quantity: number) => void;
   onRemoveProduct: (productId: number) => void;
 }
@@ -26,15 +26,18 @@ const BundleItemsTable = ({
             header: 'Quantity',
             hash: 'quantity',
             width: '200px',
-            render: ({ value }) => (
-              <Input
-                type="number"
-                min="1"
-                value={productQuantities[value] || 1}
-                onChange={(e) => onQuantityChange(value, parseInt(e.target.value))}
-                style={{ width: '120px' }}
-              />
-            )
+            render: ({ value, productId, variantId }) => {
+              const key = variantId ? `${productId}-${variantId}` : value.toString();
+              return (
+                <Input
+                  type="number"
+                  min="1"
+                  value={productQuantities[key] || 1}
+                  onChange={(e) => onQuantityChange(value, parseInt(e.target.value))}
+                  style={{ width: '120px' }}
+                />
+              );
+            }
           },
           {
             header: '',

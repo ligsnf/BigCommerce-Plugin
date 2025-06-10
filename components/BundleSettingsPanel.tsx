@@ -46,7 +46,7 @@ const BundleSettingsPanel = ({
   onVariantRemoveProduct
 }: BundleSettingsPanelProps) => {
   const hasMultipleVariants = variants && variants.length > 1;
-  const canSave = isBundle && (
+  const canSave = !isBundle || (
     hasMultipleVariants 
       ? Object.values(variantLinkedProducts).every(products => products.length > 0)
       : linkedProducts.length > 0

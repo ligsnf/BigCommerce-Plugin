@@ -27,10 +27,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const isBundle = data.find(f => f.key === 'is_bundle')?.value === 'true';
       const linkedIdsRaw = data.find(f => f.key === 'linked_product_ids')?.value;
       const linkedProductIds = linkedIdsRaw ? JSON.parse(linkedIdsRaw) : [];
-      const productQuantitiesRaw = data.find(f => f.key === 'product_quantities')?.value;
-      const productQuantities = productQuantitiesRaw ? JSON.parse(productQuantitiesRaw) : {};
 
-      return res.status(200).json({ isBundle, linkedProductIds, productQuantities });
+      return res.status(200).json({ isBundle, linkedProductIds });
     } catch (err: any) {
       console.error('[GET metafields] Error:', err);
       return res.status(500).json({ message: err.message });
@@ -40,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // POST: Save or update metafields
   if (req.method === 'POST') {
     try {
-      const { isBundle, linkedProductIds, productQuantities } = req.body;
+      const { isBundle, linkedProductIds } = req.body;
 
       if (typeof isBundle !== 'boolean') {
         return res.status(400).json({ message: 'Missing or invalid isBundle' });
@@ -75,14 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           namespace: 'bundle',
           permission_set: 'app_only',
           description: 'Array of product IDs linked in the bundle',
-        },
-        {
-          key: 'product_quantities',
-          value: JSON.stringify(productQuantities ?? {}),
-          namespace: 'bundle',
-          permission_set: 'app_only',
-          description: 'Object mapping product IDs to their quantities in the bundle',
-        },
+        }
       ];
 
       const responses = await Promise.all(
