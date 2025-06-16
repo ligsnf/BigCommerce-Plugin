@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "dev": "next",
     "build": "next build",
@@ -10,6 +11,8 @@
     "test": "jest --updateSnapshot",
     "lint": "eslint . --fix --ext .ts,.tsx,.js",
     "db:setup": "node scripts/db.js",
+    "db:start": "docker compose up -d",
+    "db:stop": "docker compose down",
     "create-webhook": "node create-webhook.js"
   },
   "keywords": [],
@@ -23,6 +26,7 @@
     "@bigcommerce/big-design": "^0.36.0",
     "@bigcommerce/big-design-icons": "^0.23.0",
     "@bigcommerce/big-design-theme": "^0.19.0",
+    "@neondatabase/serverless": "^0.9.5",
     "axios": "^1.9.0",
     "dotenv": "^16.0.3",
     "firebase": "^9.14.0",
@@ -35,7 +39,8 @@
     "react-dom": "^18.2.0",
     "react-select": "^5.10.1",
     "styled-components": "^5.3.10",
-    "swr": "^1.1.0"
+    "swr": "^1.1.0",
+    "ws": "^8.18.2"
   },
   "devDependencies": {
     "@testing-library/dom": "^8.20.1",
