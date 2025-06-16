@@ -1,12 +1,5 @@
-import { neon } from '@neondatabase/serverless';
 import { SessionProps } from '../../types';
-
-// Neon serverless connection
-const POSTGRES_URL = process.env.POSTGRES_URL;
-if (!POSTGRES_URL) {
-    throw new Error('POSTGRES_URL environment variable is not set');
-}
-const sql = neon(POSTGRES_URL);
+import { sql } from '../database.js';
 
 // Helper function to execute queries (keeping the same interface for compatibility)
 async function executeQuery(text: string, params?: any[]) {

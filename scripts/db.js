@@ -1,9 +1,6 @@
-const { neon } = require('@neondatabase/serverless');
-const axios = require('axios');
-require('dotenv').config();
-
-// Neon serverless connection
-const sql = neon(process.env.POSTGRES_URL);
+import axios from 'axios';
+import 'dotenv/config';
+import { sql } from '../lib/database.js';
 
 // Function to get store credentials from database
 async function getStoreCredentials() {
