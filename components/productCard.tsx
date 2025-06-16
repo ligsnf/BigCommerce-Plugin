@@ -15,13 +15,16 @@ interface ProductCardProps {
 }
 
 const ProductCard = ({ bundleName, products, onClick }: ProductCardProps) => {
-  const totalPrice = products.reduce((sum, p) => sum + p.price, 0);
-  const minStock = Math.min(...products.map(p => p.stock));
+  // Ensure products is an array
+  const safeProducts = Array.isArray(products) ? products : [];
+  
+  const totalPrice = safeProducts.reduce((sum, p) => sum + p.price, 0);
+  const minStock = safeProducts.length > 0 ? Math.min(...safeProducts.map(p => p.stock)) : 0;
 
   return (
     <StyledBox border="box" borderRadius="normal" padding="medium" onClick={onClick}>
       <H4 marginBottom="xxSmall">{bundleName}</H4>
-      <Text as="span"><Small>SKUs:</Small> {products.map(p => p.sku).join(', ')}</Text>
+      <Text as="span"><Small>SKUs:</Small> {safeProducts.map(p => p.sku).join(', ')}</Text>
       <Text as="span"><Small>Available Stock:</Small> {minStock}</Text>
       <Text as="span"><Small>Total Price:</Small> ${totalPrice.toFixed(2)}</Text>
     </StyledBox>

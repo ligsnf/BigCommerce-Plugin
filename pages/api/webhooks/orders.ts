@@ -47,14 +47,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const orderDetails = await orderProductsRes.json();
+    
+    // Ensure orderDetails is an array
+    if (!Array.isArray(orderDetails)) {
+      console.error('❌ orderDetails is not an array:', typeof orderDetails, orderDetails);
+
+      return res.status(500).json({ message: 'Invalid order details data structure' });
+    }
 
     // Get all products that are bundles
     const { data: allProducts } = await bc.get('/catalog/products');
     const bundleProducts = [];
+    
+    // Ensure allProducts is an array
+    if (!Array.isArray(allProducts)) {
+      console.error('❌ allProducts is not an array:', typeof allProducts, allProducts);
+      
+      return res.status(500).json({ message: 'Invalid products data structure' });
+    }
 
     // Find all bundles and their details
     for (const product of allProducts) {
       const { data: metafields } = await bc.get(`/catalog/products/${product.id}/metafields`);
+      
+      // Ensure metafields is an array
+      if (!Array.isArray(metafields)) {
+        console.warn(`⚠️ metafields for product ${product.id} is not an array:`, typeof metafields);
+        continue;
+      }
+      
       const isBundle = metafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
 
       if (isBundle) {
@@ -80,6 +101,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Check if the ordered item is a bundle
       const { data: itemMetafields } = await bc.get(`/catalog/products/${productId}/metafields`);
+      
+      // Ensure itemMetafields is an array
+      if (!Array.isArray(itemMetafields)) {
+        console.warn(`⚠️ itemMetafields for product ${productId} is not an array:`, typeof itemMetafields);
+        continue;
+      }
+      
       const isBundle = itemMetafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
 
       if (isBundle) {
