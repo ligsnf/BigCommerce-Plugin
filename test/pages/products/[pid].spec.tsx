@@ -7,9 +7,14 @@ jest.mock('next/router', () => ({
     useRouter: jest.fn(),
 }));
 
+const mockedUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
+
 describe('Product Info Form', () => {
     const router = { query: { pid: '1' } };
-    useRouter.mockReturnValue(router);
+    
+    beforeEach(() => {
+        mockedUseRouter.mockReturnValue(router as any);
+    });
 
     test('renders correctly', async () => {
         const { container } = render(<ProductInfo />);

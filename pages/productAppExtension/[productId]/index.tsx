@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+/* eslint-disable no-console */
 import { useRouter } from 'next/router';
-import ErrorMessage from '@components/error';
-import Loading from '@components/loading';
-import { useProductInfo } from '@lib/hooks';
-import { useProductList } from '@lib/hooks';
+import { useEffect, useState } from 'react';
 import BasicInfoPanel from '@components/BasicInfoPanel';
 import BundleSettingsPanel from '@components/BundleSettingsPanel';
+import ErrorMessage from '@components/error';
+import Loading from '@components/loading';
+import { useProductInfo, useProductList } from '@lib/hooks';
 
 interface Variant {
   id: number;
@@ -41,6 +41,7 @@ const ProductAppExtension = () => {
     .filter(({ id, sku }) => {
       if (id === productId) return false;
       if (sku?.startsWith('BUN-')) return false;
+
       return true;
     })
     .map(({ id, sku, name, price, inventory_level, variants, inventory_tracking }) => ({
@@ -90,18 +91,19 @@ const ProductAppExtension = () => {
   // Handle item selection
   const handleItemSelect = (selectedItem) => {
     if (!selectedItem) return;
-    
+
     const product = products.find(p => p.value === selectedItem.productId);
     if (!product) return;
 
     const hasMultipleVariants = product.variants && product.variants.length > 1;
-    const hasInventoryTracking = selectedItem.isMainProduct 
+    const hasInventoryTracking = selectedItem.isMainProduct
       ? product.inventory_tracking === "product"
       : hasMultipleVariants && product.inventory_tracking === "variant";
 
     if (!hasInventoryTracking) {
       alert("This product/variant cannot be added to bundles because it has inventory tracking disabled.");
       setSelectedItem(null);
+
       return;
     }
 
@@ -143,7 +145,7 @@ const ProductAppExtension = () => {
   useEffect(() => {
     async function fetchMetafields() {
       if (!productId || products.length === 0) return;
-  
+
       try {
         const hasMultipleVariants = variants.length > 1;
         console.log('Initial load - Product data:', {
@@ -152,21 +154,23 @@ const ProductAppExtension = () => {
           variants,
           products
         });
-        
+
         if (hasMultipleVariants) {
           // Fetch metafields for each variant
           const variantMetafieldsPromises = variants.map(async (variant) => {
             const res = await fetch(`/api/productAppExtension/${productId}/variants/${variant.id}/metafields`);
             if (!res.ok) {
               console.warn(`Failed to load metafields for variant ${variant.id}:`, await res.text());
+
               return null;
             }
+
             return res.json();
           });
 
           const variantMetafieldsResults = await Promise.all(variantMetafieldsPromises);
           console.log('Variant metafields results:', variantMetafieldsResults);
-          
+
           // Process variant metafields
           const variantData = {};
           const variantQuantities = {};
@@ -176,21 +180,22 @@ const ProductAppExtension = () => {
             if (data) {
               const variantId = variants[index].id;
               variantData[variantId] = data.isBundle;
-              
+
               // Map linked products with their quantities
               variantProducts[variantId] = data.linkedProductIds.map((linkedProduct) => {
                 // Handle both old format (just ID) and new format (object with productId and variantId)
                 const productId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
                 const variantId = typeof linkedProduct === 'object' ? linkedProduct.variantId : null;
                 const quantity = typeof linkedProduct === 'object' ? linkedProduct.quantity : 1;
-                
+
                 // First try to find a product with this variant ID
-                const productWithVariant = products.find(p => 
+                const productWithVariant = products.find(p =>
                   p.variants && p.variants.some(v => v.id === variantId)
                 );
-                
+
                 if (productWithVariant && variantId) {
                   const variant = productWithVariant.variants.find(v => v.id === variantId);
+
                   return {
                     value: variantId,
                     label: `${productWithVariant.label} [${variant.option_values.map(ov => ov.label).join(' - ')}]`,
@@ -201,9 +206,10 @@ const ProductAppExtension = () => {
                     quantity: quantity
                   };
                 }
-                
+
                 // Fallback to finding by product ID
                 const match = products.find(p => p.value === productId);
+
                 return match ? { ...match, quantity } : { value: productId, label: `Product ${productId}`, quantity };
               });
 
@@ -225,7 +231,7 @@ const ProductAppExtension = () => {
 
           setVariantLinkedProducts(variantProducts);
           setVariantProductQuantities(variantQuantities);
-          
+
           // Set isBundle based on whether any variant is a bundle
           setIsBundle(Object.values(variantData).some(isBundle => isBundle));
         } else {
@@ -233,23 +239,24 @@ const ProductAppExtension = () => {
           const res = await fetch(`/api/productAppExtension/${productId}/metafields`);
           const data = await res.json();
           console.log('Product metafields data:', data);
-    
+
           if (res.ok) {
             setIsBundle(data.isBundle);
-            
+
             // Map products with their quantities
             const mappedProducts = data.linkedProductIds.map((linkedProduct) => {
               // Handle both old format (just ID) and new format (object with productId and variantId)
               const id = typeof linkedProduct === 'object' ? linkedProduct.variantId || linkedProduct.productId : linkedProduct;
               const quantity = typeof linkedProduct === 'object' ? linkedProduct.quantity : 1;
-              
+
               // First try to find a product with this variant ID
-              const productWithVariant = products.find(p => 
+              const productWithVariant = products.find(p =>
                 p.variants && p.variants.some(v => v.id === id)
               );
-              
+
               if (productWithVariant) {
                 const variant = productWithVariant.variants.find(v => v.id === id);
+
                 return {
                   value: id,
                   label: `${productWithVariant.label} [${variant.option_values.map(ov => ov.label).join(' - ')}]`,
@@ -260,10 +267,11 @@ const ProductAppExtension = () => {
                   quantity: quantity
                 };
               }
-              
+
               // Fallback to finding by product ID
               const match = products.find(p => p.value === id);
               const product = match ?? { value: id, label: `Product ${id}` };
+
               return { ...product, quantity };
             });
 
@@ -274,7 +282,7 @@ const ProductAppExtension = () => {
                 p.quantity
               ])
             );
-            
+
             setProductQuantities(quantities);
             console.log('Mapped products for table:', mappedProducts);
             setLinkedProducts(mappedProducts);
@@ -286,8 +294,9 @@ const ProductAppExtension = () => {
         console.error('Error fetching metafields:', err);
       }
     }
-  
+
     fetchMetafields();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId, products.length, variants]);
 
   const handleQuantityChange = (productId, quantity) => {
@@ -352,6 +361,7 @@ const ProductAppExtension = () => {
             linkedProductIds: isActuallyBundle ? (variantLinkedProducts[variant.id] || []).map((p) => {
               const productId = p.productId || p.value;
               const key = p.variantId ? `${productId}-${p.variantId}` : productId.toString();
+
               return {
                 productId: productId,
                 variantId: p.variantId || null,
@@ -390,28 +400,32 @@ const ProductAppExtension = () => {
                 const res = await fetch(`/api/products/${p.value}`);
                 if (!res.ok) {
                   console.warn(`Failed to fetch stock for product ${p.value}`);
+
                   return 0;
                 }
                 const data = await res.json();
-                
+
                 // If the product has variants and we have a variant ID, get the specific variant's stock
                 if (data.variants && data.variants.length > 0 && p.variantId) {
                   const variantRes = await fetch(`/api/products/${p.value}/variants/${p.variantId}`);
                   if (!variantRes.ok) {
                     console.warn(`Failed to fetch stock for variant ${p.variantId} of product ${p.value}`);
+
                     return 0;
                   }
                   const variantData = await variantRes.json();
                   const key = `${p.productId}-${p.variantId}`;
+
                   return Math.floor((variantData.inventory_level ?? 0) / (productQuantities[key] || 1));
                 }
-                
+
                 // For non-variant products or if we don't have a variant ID, use the product's stock
                 const key = p.variantId ? `${p.productId}-${p.variantId}` : p.value.toString();
+
                 return Math.floor((data.inventory_level ?? 0) / (productQuantities[key] || 1));
               })
             );
-            
+
             const minStock = Math.min(...stockLevels);
             updatePromises.push(
               fetch(`/api/products/${productId}/variants/${variant.id}`, {
@@ -432,6 +446,7 @@ const ProductAppExtension = () => {
             // Ensure we have both productId and variantId
             const productId = p.productId || p.value;
             const key = p.variantId ? `${productId}-${p.variantId}` : productId.toString();
+
             return {
               productId: productId,
               variantId: p.variantId || null,
@@ -451,66 +466,70 @@ const ProductAppExtension = () => {
         );
 
         // Update main product
-      const currentSku = product?.sku || '';
-      const hasBunPrefix = currentSku.startsWith('BUN-');
-      let newSku = currentSku;
+        const currentSku = product?.sku || '';
+        const hasBunPrefix = currentSku.startsWith('BUN-');
+        let newSku = currentSku;
 
-      if (isActuallyBundle && !hasBunPrefix) {
-        newSku = `BUN-${currentSku}`;
-      } else if (!isActuallyBundle && hasBunPrefix) {
-        newSku = currentSku.replace('BUN-', '');
-      }
+        if (isActuallyBundle && !hasBunPrefix) {
+          newSku = `BUN-${currentSku}`;
+        } else if (!isActuallyBundle && hasBunPrefix) {
+          newSku = currentSku.replace('BUN-', '');
+        }
 
-      let updateData: any = {};
-      
-      if (newSku !== currentSku) {
-        updateData.sku = newSku;
-      }
+        const updateData: any = {};
 
-      if (isActuallyBundle) {
-        const stockLevels = await Promise.all(
-          linkedProducts.map(async (p) => {
-            // Use productId for fetching the product, not the variant ID
-            const productId = p.productId || p.value;
-            const res = await fetch(`/api/products/${productId}`);
-            if (!res.ok) {
-              console.warn(`Failed to fetch stock for product ${productId}`);
-              return 0;
-            }
-            const data = await res.json();
-            
-            // If the product has variants and we have a variant ID, get the specific variant's stock
-            if (data.variants && data.variants.length > 0 && p.variantId) {
-              const variantRes = await fetch(`/api/products/${productId}/variants/${p.variantId}`);
-              if (!variantRes.ok) {
-                console.warn(`Failed to fetch stock for variant ${p.variantId} of product ${productId}`);
+        if (newSku !== currentSku) {
+          updateData.sku = newSku;
+        }
+
+        if (isActuallyBundle) {
+          const stockLevels = await Promise.all(
+            linkedProducts.map(async (p) => {
+              // Use productId for fetching the product, not the variant ID
+              const productId = p.productId || p.value;
+              const res = await fetch(`/api/products/${productId}`);
+              if (!res.ok) {
+                console.warn(`Failed to fetch stock for product ${productId}`);
+
                 return 0;
               }
-              const variantData = await variantRes.json();
-              const key = `${productId}-${p.variantId}`;
-              return Math.floor((variantData.inventory_level ?? 0) / (productQuantities[key] || 1));
-            }
-            
-            // For non-variant products or if we don't have a variant ID, use the product's stock
-            const key = p.variantId ? `${productId}-${p.variantId}` : productId.toString();
-            return Math.floor((data.inventory_level ?? 0) / (productQuantities[key] || 1));
-          })
-        );
-        
-        const minStock = Math.min(...stockLevels);
-        updateData.inventory_level = minStock;
-        updateData.inventory_tracking = "product";
-        updateData.is_visible = true;
-      } else {
-        updateData.inventory_tracking = "none";
-        updateData.inventory_level = null;
-      }
+              const data = await res.json();
+
+              // If the product has variants and we have a variant ID, get the specific variant's stock
+              if (data.variants && data.variants.length > 0 && p.variantId) {
+                const variantRes = await fetch(`/api/products/${productId}/variants/${p.variantId}`);
+                if (!variantRes.ok) {
+                  console.warn(`Failed to fetch stock for variant ${p.variantId} of product ${productId}`);
+
+                  return 0;
+                }
+                const variantData = await variantRes.json();
+                const key = `${productId}-${p.variantId}`;
+
+                return Math.floor((variantData.inventory_level ?? 0) / (productQuantities[key] || 1));
+              }
+
+              // For non-variant products or if we don't have a variant ID, use the product's stock
+              const key = p.variantId ? `${productId}-${p.variantId}` : productId.toString();
+
+              return Math.floor((data.inventory_level ?? 0) / (productQuantities[key] || 1));
+            })
+          );
+
+          const minStock = Math.min(...stockLevels);
+          updateData.inventory_level = minStock;
+          updateData.inventory_tracking = "product";
+          updateData.is_visible = true;
+        } else {
+          updateData.inventory_tracking = "none";
+          updateData.inventory_level = null;
+        }
 
         updatePromises.push(
           fetch(`/api/products/${productId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData),
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData),
           })
         );
       }

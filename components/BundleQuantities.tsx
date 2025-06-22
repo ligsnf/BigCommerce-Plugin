@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Panel, FormGroup, Input, Button, Small, Box, Text, Flex, Form as BigDesignForm } from '@bigcommerce/big-design';
+import { Box, Button, Flex, Input, Panel, Text } from '@bigcommerce/big-design';
 import { useRouter } from 'next/router';
+import { useState } from 'react';
 
 interface BundleQuantitiesProps {
   bundleId: number;
@@ -8,8 +8,8 @@ interface BundleQuantitiesProps {
   initialQuantities?: number[];
 }
 
-export const BundleQuantities: React.FC<BundleQuantitiesProps> = ({ 
-  bundleId, 
+export const BundleQuantities: React.FC<BundleQuantitiesProps> = ({
+  bundleId,
   linkedProductIds,
   initialQuantities = []
 }) => {

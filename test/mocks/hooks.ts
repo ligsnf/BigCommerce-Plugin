@@ -41,3 +41,26 @@ const productMock = {
 export const useProductInfo = jest.fn().mockImplementation(() => ({
     product: productMock,
 }));
+
+// useBundles Mock
+const bundlesMock = [
+    {
+        id: 1,
+        name: 'Sample Bundle 1',
+        linkedProductIds: [1, 2, 3],
+        quantities: [1, 2, 1],
+    },
+    {
+        id: 2,
+        name: 'Sample Bundle 2',
+        linkedProductIds: [4, 5],
+        quantities: [1, 1],
+    },
+];
+
+export const useBundles = jest.fn().mockImplementation(() => ({
+    bundles: bundlesMock,
+    isLoading: false,
+    error: null,
+    refetch: jest.fn(),
+}));

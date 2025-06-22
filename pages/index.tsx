@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { Box, Flex, H1, Panel, Button, Tabs, Table } from '@bigcommerce/big-design';
+/* eslint-disable no-console */
+import { Box, Button, Flex, H1, Panel, Table, Tabs } from '@bigcommerce/big-design';
+import { useEffect, useState } from 'react';
 import ErrorMessage from '@components/error';
 import Loading from '@components/loading';
 import { useSession } from '../context/session';
@@ -32,7 +32,6 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [activeTab, setActiveTab] = useState<'products' | 'bundles'>('products');
-  const router = useRouter();
   const { context } = useSession();
   
   // Extract store hash from JWT token
@@ -44,6 +43,7 @@ export default function Home() {
     console.log('Decoded JWT:', context ? JSON.parse(atob(context.split('.')[1])) : null);
     console.log('Store Hash:', storeHash);
     console.log('=======================');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [context]);
 
   useEffect(() => {

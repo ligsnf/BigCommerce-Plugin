@@ -1,4 +1,4 @@
-import mysql, { PoolOptions } from 'mysql2';
+import { createPool, PoolOptions } from 'mysql2';
 import { promisify } from 'util';
 import { SessionProps, StoreData } from '../../types';
 
@@ -11,7 +11,7 @@ const MYSQL_CONFIG: PoolOptions = {
 };
 
 const dbUrl = process.env.DATABASE_URL;
-const pool = dbUrl ? mysql.createPool(dbUrl) : mysql.createPool(MYSQL_CONFIG);
+const pool = dbUrl ? createPool(dbUrl) : createPool(MYSQL_CONFIG);
 const query = promisify(pool.query.bind(pool));
 
 export { query };
@@ -65,12 +65,14 @@ export async function hasStoreUser(storeHash: string, userId: string) {
     if (!storeHash || !userId) return false;
     const values = [userId, storeHash];
     const results = await query('SELECT * FROM storeUsers WHERE userId = ? AND storeHash = ? LIMIT 1', values);
+
     return results.length > 0;
 }
 
 export async function getStoreToken(storeHash: string) {
     if (!storeHash) return null;
     const results = await query('SELECT accessToken FROM stores WHERE storeHash = ?', storeHash);
+
     return results.length ? results[0].accessToken : null;
 }
 
@@ -81,6 +83,7 @@ export async function deleteStore({ store_hash: storeHash }: SessionProps) {
 export async function hasAppExtensionsScope(storeHash: string): Promise<boolean> {
     const scopes = await query('SELECT scope FROM stores WHERE storeHash = ?', storeHash);
     const row = scopes[0];
+
     return row?.scope?.includes('store_app_extensions_manage') ?? false;
 }
 

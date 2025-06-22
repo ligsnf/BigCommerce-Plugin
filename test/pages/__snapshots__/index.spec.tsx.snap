@@ -2,62 +2,281 @@
 
 exports[`Homepage renders correctly 1`] = `
 <div
-  class="styled__StyledBox-sc-sj5f1m-0 ddRoJX styled__StyledPanel-sc-1h6ef3q-0 RJZJk"
-  id="home"
+  class="styled__StyledBox-sc-sj5f1m-0 dnUGcK styled__StyledPanel-sc-1h6ef3q-0 frQUTZ"
 >
   <div
-    class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledFlex-sc-hcvk8l-0 dEoXps"
+    class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 dzErNZ"
   >
     <h2
-      class="styled__StyledH2-sc-tqnj75-2 styled__StyledH2-sc-1h6ef3q-1 ilmBBr iRmYTD"
+      class="styled__StyledH2-sc-tqnj75-2 styled__StyledH2-sc-1h6ef3q-1 JBgla iAkOrm"
     >
-      Homepage
+      Bundle Products
     </h2>
   </div>
   <div
-    class="styled__StyledBox-sc-sj5f1m-0 bixGIv styled__StyledFlex-sc-hcvk8l-0 gCdIQq"
+    class="styled__StyledBox-sc-sj5f1m-0 dJATMI styled__StyledFlex-sc-hcvk8l-0 ibZQvs"
   >
-    <div
-      class="styled__StyledBox-sc-sj5f1m-0 edPngG pages__StyledBox-sc-jwwna7-0 dYpWSa"
+    <button
+      class="styled__StyledButton-sc-3yq204-0 kuKGmE bd-button"
     >
-      <h4
-        class="styled__StyledH4-sc-tqnj75-4 VrTsl"
+      <span
+        class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
       >
-        Inventory count
-      </h4>
-      <h1
-        class="styled__StyledH1-sc-tqnj75-1 dRcaXw"
+        Refresh Bundles
+      </span>
+    </button>
+  </div>
+  <div
+    class="styled__StyledBox-sc-sj5f1m-0 kqfsfW"
+  >
+    <h4
+      class="styled__StyledH4-sc-tqnj75-4 rUgdM"
+    >
+      Bundle: 
+      Sample Bundle 1
+    </h4>
+    <p
+      class="styled__StyledText-sc-tqnj75-5 fnzVjl"
+    >
+      ID: 
+      1
+    </p>
+    <div
+      class="styled__StyledBox-sc-sj5f1m-0 dnUGcK styled__StyledPanel-sc-1h6ef3q-0 frQUTZ"
+    >
+      <div
+        class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 dzErNZ"
       >
-        3
-      </h1>
+        <h2
+          class="styled__StyledH2-sc-tqnj75-2 styled__StyledH2-sc-1h6ef3q-1 JBgla iAkOrm"
+        >
+          Bundle Product Quantities
+        </h2>
+      </div>
+      <form>
+        <div
+          class="styled__StyledBox-sc-sj5f1m-0 BRgwK"
+        >
+          <p
+            class="styled__StyledText-sc-tqnj75-5 fnzVjl"
+          >
+            Product ID: 
+            1
+          </p>
+          <div>
+            <span
+              class="styled__StyledInputWrapper-sc-g32raa-0 ivVOAe"
+            >
+              <div
+                class="styled__StyledInputContent-sc-g32raa-3 cklbdD"
+              >
+                <input
+                  class="styled__StyledInput-sc-g32raa-1 hdauTU"
+                  id=":r0:"
+                  min="1"
+                  type="number"
+                  value="1"
+                />
+              </div>
+            </span>
+          </div>
+        </div>
+        <div
+          class="styled__StyledBox-sc-sj5f1m-0 BRgwK"
+        >
+          <p
+            class="styled__StyledText-sc-tqnj75-5 fnzVjl"
+          >
+            Product ID: 
+            2
+          </p>
+          <div>
+            <span
+              class="styled__StyledInputWrapper-sc-g32raa-0 ivVOAe"
+            >
+              <div
+                class="styled__StyledInputContent-sc-g32raa-3 cklbdD"
+              >
+                <input
+                  class="styled__StyledInput-sc-g32raa-1 hdauTU"
+                  id=":r1:"
+                  min="1"
+                  type="number"
+                  value="2"
+                />
+              </div>
+            </span>
+          </div>
+        </div>
+        <div
+          class="styled__StyledBox-sc-sj5f1m-0 BRgwK"
+        >
+          <p
+            class="styled__StyledText-sc-tqnj75-5 fnzVjl"
+          >
+            Product ID: 
+            3
+          </p>
+          <div>
+            <span
+              class="styled__StyledInputWrapper-sc-g32raa-0 ivVOAe"
+            >
+              <div
+                class="styled__StyledInputContent-sc-g32raa-3 cklbdD"
+              >
+                <input
+                  class="styled__StyledInput-sc-g32raa-1 hdauTU"
+                  id=":r2:"
+                  min="1"
+                  type="number"
+                  value="1"
+                />
+              </div>
+            </span>
+          </div>
+        </div>
+        <div
+          class="styled__StyledBox-sc-sj5f1m-0 gPDrJc"
+        >
+          <div
+            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 bTLtWP"
+          >
+            <button
+              class="styled__StyledButton-sc-3yq204-0 jExzGK bd-button"
+              type="submit"
+            >
+              <span
+                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+              >
+                Update Quantities
+              </span>
+            </button>
+            <button
+              class="styled__StyledButton-sc-3yq204-0 kuKGmE bd-button"
+              type="button"
+            >
+              <span
+                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+              >
+                Refresh Page
+              </span>
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
-    <div
-      class="styled__StyledBox-sc-sj5f1m-0 edPngG pages__StyledBox-sc-jwwna7-0 dYpWSa"
+  </div>
+  <div
+    class="styled__StyledBox-sc-sj5f1m-0 kqfsfW"
+  >
+    <h4
+      class="styled__StyledH4-sc-tqnj75-4 rUgdM"
     >
-      <h4
-        class="styled__StyledH4-sc-tqnj75-4 VrTsl"
-      >
-        Variant count
-      </h4>
-      <h1
-        class="styled__StyledH1-sc-tqnj75-1 dRcaXw"
-      >
-        2
-      </h1>
-    </div>
-    <div
-      class="styled__StyledBox-sc-sj5f1m-0 jHwTSQ pages__StyledBox-sc-jwwna7-0 dYpWSa"
+      Bundle: 
+      Sample Bundle 2
+    </h4>
+    <p
+      class="styled__StyledText-sc-tqnj75-5 fnzVjl"
     >
-      <h4
-        class="styled__StyledH4-sc-tqnj75-4 VrTsl"
+      ID: 
+      2
+    </p>
+    <div
+      class="styled__StyledBox-sc-sj5f1m-0 dnUGcK styled__StyledPanel-sc-1h6ef3q-0 frQUTZ"
+    >
+      <div
+        class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 dzErNZ"
       >
-        Primary category
-      </h4>
-      <h1
-        class="styled__StyledH1-sc-tqnj75-1 dRcaXw"
-      >
-        widgets
-      </h1>
+        <h2
+          class="styled__StyledH2-sc-tqnj75-2 styled__StyledH2-sc-1h6ef3q-1 JBgla iAkOrm"
+        >
+          Bundle Product Quantities
+        </h2>
+      </div>
+      <form>
+        <div
+          class="styled__StyledBox-sc-sj5f1m-0 BRgwK"
+        >
+          <p
+            class="styled__StyledText-sc-tqnj75-5 fnzVjl"
+          >
+            Product ID: 
+            4
+          </p>
+          <div>
+            <span
+              class="styled__StyledInputWrapper-sc-g32raa-0 ivVOAe"
+            >
+              <div
+                class="styled__StyledInputContent-sc-g32raa-3 cklbdD"
+              >
+                <input
+                  class="styled__StyledInput-sc-g32raa-1 hdauTU"
+                  id=":r3:"
+                  min="1"
+                  type="number"
+                  value="1"
+                />
+              </div>
+            </span>
+          </div>
+        </div>
+        <div
+          class="styled__StyledBox-sc-sj5f1m-0 BRgwK"
+        >
+          <p
+            class="styled__StyledText-sc-tqnj75-5 fnzVjl"
+          >
+            Product ID: 
+            5
+          </p>
+          <div>
+            <span
+              class="styled__StyledInputWrapper-sc-g32raa-0 ivVOAe"
+            >
+              <div
+                class="styled__StyledInputContent-sc-g32raa-3 cklbdD"
+              >
+                <input
+                  class="styled__StyledInput-sc-g32raa-1 hdauTU"
+                  id=":r4:"
+                  min="1"
+                  type="number"
+                  value="1"
+                />
+              </div>
+            </span>
+          </div>
+        </div>
+        <div
+          class="styled__StyledBox-sc-sj5f1m-0 gPDrJc"
+        >
+          <div
+            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 bTLtWP"
+          >
+            <button
+              class="styled__StyledButton-sc-3yq204-0 jExzGK bd-button"
+              type="submit"
+            >
+              <span
+                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+              >
+                Update Quantities
+              </span>
+            </button>
+            <button
+              class="styled__StyledButton-sc-3yq204-0 kuKGmE bd-button"
+              type="button"
+            >
+              <span
+                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+              >
+                Refresh Page
+              </span>
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 </div>
