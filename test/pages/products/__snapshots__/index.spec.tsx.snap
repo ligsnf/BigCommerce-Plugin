@@ -213,11 +213,15 @@ exports[`Product List renders correctly 1`] = `
         <td
           class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
         >
-          <a
-            class="styled__StyledLink-sc-n9mww9-0 haEQqw"
+          <button
+            class="styled__StyledButton-sc-3yq204-0 hIozky bd-button"
           >
-            Product 0
-          </a>
+            <span
+              class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+            >
+              Product 0
+            </span>
+          </button>
         </td>
         <td
           class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
@@ -295,11 +299,15 @@ exports[`Product List renders correctly 1`] = `
         <td
           class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
         >
-          <a
-            class="styled__StyledLink-sc-n9mww9-0 haEQqw"
+          <button
+            class="styled__StyledButton-sc-3yq204-0 hIozky bd-button"
           >
-            Product 1
-          </a>
+            <span
+              class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+            >
+              Product 1
+            </span>
+          </button>
         </td>
         <td
           class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
@@ -377,11 +385,15 @@ exports[`Product List renders correctly 1`] = `
         <td
           class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
         >
-          <a
-            class="styled__StyledLink-sc-n9mww9-0 haEQqw"
+          <button
+            class="styled__StyledButton-sc-3yq204-0 hIozky bd-button"
           >
-            Product 2
-          </a>
+            <span
+              class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+            >
+              Product 2
+            </span>
+          </button>
         </td>
         <td
           class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
@@ -459,11 +471,15 @@ exports[`Product List renders correctly 1`] = `
         <td
           class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
         >
-          <a
-            class="styled__StyledLink-sc-n9mww9-0 haEQqw"
+          <button
+            class="styled__StyledButton-sc-3yq204-0 hIozky bd-button"
           >
-            Product 3
-          </a>
+            <span
+              class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+            >
+              Product 3
+            </span>
+          </button>
         </td>
         <td
           class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
@@ -541,11 +557,15 @@ exports[`Product List renders correctly 1`] = `
         <td
           class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
         >
-          <a
-            class="styled__StyledLink-sc-n9mww9-0 haEQqw"
+          <button
+            class="styled__StyledButton-sc-3yq204-0 hIozky bd-button"
           >
-            Product 4
-          </a>
+            <span
+              class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+            >
+              Product 4
+            </span>
+          </button>
         </td>
         <td
           class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
