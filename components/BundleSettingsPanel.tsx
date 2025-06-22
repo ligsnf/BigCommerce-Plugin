@@ -1,6 +1,6 @@
-import { Box, Button, H4, Panel, Switch, ButtonGroup } from '@bigcommerce/big-design';
-import ProductSelector from './ProductSelector';
+import { Box, Button, H4, Panel, Switch } from '@bigcommerce/big-design';
 import BundleItemsTable from './BundleItemsTable';
+import ProductSelector from './ProductSelector';
 
 interface BundleSettingsPanelProps {
   isBundle: boolean;

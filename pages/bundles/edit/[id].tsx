@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import CreateBundleForm from '../../../components/createBundleForm';
 import ErrorMessage from '../../../components/error';
 import Loading from '../../../components/loading';
-import { alertsManager } from '../../_app';
+import { alertsManager } from '../../../lib/alerts';
 
 const EditBundlePage = () => {
   const router = useRouter();

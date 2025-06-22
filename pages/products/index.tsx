@@ -1,13 +1,13 @@
-import { Button, Dropdown, Panel, Small, Link as StyledLink, Table, TableSortDirection } from '@bigcommerce/big-design';
+/* eslint-disable no-console */
+import { Button, Dropdown, Panel, Small, Table, TableSortDirection } from '@bigcommerce/big-design';
 import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ReactElement, useState, useEffect } from 'react';
+import { ReactElement, useEffect, useState } from 'react';
 import ErrorMessage from '../../components/error';
 import Loading from '../../components/loading';
+import { useSession } from '../../context/session';
 import { useProductList } from '../../lib/hooks';
 import { TableItem } from '../../types';
-import { useSession } from '../../context/session';
 
 const Products = () => {
     const [itemsPerPage, setItemsPerPage] = useState(10);

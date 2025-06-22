@@ -16,6 +16,7 @@ class AlertsManager {
 
     subscribe(callback: (alerts: AlertProps[]) => void) {
         this.subscribers.push(callback);
+
         return () => {
             this.subscribers = this.subscribers.filter(cb => cb !== callback);
         };

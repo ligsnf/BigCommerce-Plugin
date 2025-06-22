@@ -28,6 +28,7 @@ const BundleItemsTable = ({
             width: '200px',
             render: ({ value, productId, variantId }) => {
               const key = variantId ? `${productId}-${variantId}` : value.toString();
+
               return (
                 <Input
                   type="number"

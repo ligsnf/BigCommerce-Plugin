@@ -31,6 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ isBundle, linkedProductIds });
     } catch (err: any) {
       console.error('[GET variant metafields] Error:', err);
+
       return res.status(500).json({ message: err.message });
     }
   }
@@ -95,6 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
 
           const result = await response.json();
+
           return result;
         })
       );
@@ -102,6 +104,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ message: 'Variant metafields saved/updated', responses });
     } catch (err: any) {
       console.error('[POST variant metafields] Error:', err);
+
       return res.status(500).json({ message: err.message });
     }
   }

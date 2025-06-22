@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from '@lib/auth';
-import { bigcommerceClient } from '@lib/auth';
+import { bigcommerceClient , getSession } from '@lib/auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -44,6 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Check if any variants are bundles
         const hasVariantBundles = product.variants?.some(variant => {
           const variantMetafields = variant.metafields || [];
+
           return variantMetafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
         });
 
