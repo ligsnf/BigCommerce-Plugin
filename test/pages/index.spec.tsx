@@ -3,6 +3,13 @@ import { render, screen, waitFor } from '@test/utils';
 
 jest.mock('@lib/hooks/use-bundles', () => require('@mocks/hooks'));
 
+// Mock the session context
+jest.mock('../../context/session', () => ({
+    useSession: () => ({
+        context: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0IjoidGVzdC1zdG9yZS1oYXNoIn0.test-signature'
+    })
+}));
+
 // Mock the fetch API
 global.fetch = jest.fn();
 

@@ -22,6 +22,7 @@ interface Product {
 const ProductAppExtension = () => {
   const router = useRouter();
   const productId = Number(router.query?.productId);
+  const context = router.query?.context as string;
 
   const { error, isLoading, product } = useProductInfo(productId);
   const { name, variants = [] } = (product ?? { variants: [] }) as Product;
@@ -158,7 +159,7 @@ const ProductAppExtension = () => {
         if (hasMultipleVariants) {
           // Fetch metafields for each variant
           const variantMetafieldsPromises = variants.map(async (variant) => {
-            const res = await fetch(`/api/productAppExtension/${productId}/variants/${variant.id}/metafields`);
+            const res = await fetch(`/api/productAppExtension/${productId}/variants/${variant.id}/metafields?context=${encodeURIComponent(context)}`);
             if (!res.ok) {
               console.warn(`Failed to load metafields for variant ${variant.id}:`, await res.text());
 
@@ -236,7 +237,7 @@ const ProductAppExtension = () => {
           setIsBundle(Object.values(variantData).some(isBundle => isBundle));
         } else {
           // For products without variants, fetch product metafields
-          const res = await fetch(`/api/productAppExtension/${productId}/metafields`);
+          const res = await fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`);
           const data = await res.json();
           console.log('Product metafields data:', data);
 
@@ -373,7 +374,7 @@ const ProductAppExtension = () => {
           console.log(`Saving metafields for variant ${variant.id}:`, JSON.stringify(variantMetafieldsData, null, 2));
 
           updatePromises.push(
-            fetch(`/api/productAppExtension/${productId}/variants/${variant.id}/metafields`, {
+            fetch(`/api/productAppExtension/${productId}/variants/${variant.id}/metafields?context=${encodeURIComponent(context)}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(variantMetafieldsData),
@@ -382,7 +383,7 @@ const ProductAppExtension = () => {
 
           if (newSku !== currentSku) {
             updatePromises.push(
-              fetch(`/api/products/${productId}/variants/${variant.id}`, {
+              fetch(`/api/products/${productId}/variants/${variant.id}?context=${encodeURIComponent(context)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -397,7 +398,7 @@ const ProductAppExtension = () => {
             // Calculate variant stock based on linked products
             const stockLevels = await Promise.all(
               variantLinkedProducts[variant.id].map(async (p) => {
-                const res = await fetch(`/api/products/${p.value}`);
+                const res = await fetch(`/api/products/${p.value}?context=${encodeURIComponent(context)}`);
                 if (!res.ok) {
                   console.warn(`Failed to fetch stock for product ${p.value}`);
 
@@ -407,7 +408,7 @@ const ProductAppExtension = () => {
 
                 // If the product has variants and we have a variant ID, get the specific variant's stock
                 if (data.variants && data.variants.length > 0 && p.variantId) {
-                  const variantRes = await fetch(`/api/products/${p.value}/variants/${p.variantId}`);
+                  const variantRes = await fetch(`/api/products/${p.value}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
                   if (!variantRes.ok) {
                     console.warn(`Failed to fetch stock for variant ${p.variantId} of product ${p.value}`);
 
@@ -428,7 +429,7 @@ const ProductAppExtension = () => {
 
             const minStock = Math.min(...stockLevels);
             updatePromises.push(
-              fetch(`/api/products/${productId}/variants/${variant.id}`, {
+              fetch(`/api/products/${productId}/variants/${variant.id}?context=${encodeURIComponent(context)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -458,7 +459,7 @@ const ProductAppExtension = () => {
         console.log('Saving metafields for main product:', JSON.stringify(metafieldsData, null, 2));
 
         updatePromises.push(
-          fetch(`/api/productAppExtension/${productId}/metafields`, {
+          fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(metafieldsData),
@@ -487,7 +488,7 @@ const ProductAppExtension = () => {
             linkedProducts.map(async (p) => {
               // Use productId for fetching the product, not the variant ID
               const productId = p.productId || p.value;
-              const res = await fetch(`/api/products/${productId}`);
+              const res = await fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`);
               if (!res.ok) {
                 console.warn(`Failed to fetch stock for product ${productId}`);
 
@@ -497,7 +498,7 @@ const ProductAppExtension = () => {
 
               // If the product has variants and we have a variant ID, get the specific variant's stock
               if (data.variants && data.variants.length > 0 && p.variantId) {
-                const variantRes = await fetch(`/api/products/${productId}/variants/${p.variantId}`);
+                const variantRes = await fetch(`/api/products/${productId}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
                 if (!variantRes.ok) {
                   console.warn(`Failed to fetch stock for variant ${p.variantId} of product ${productId}`);
 
@@ -526,7 +527,7 @@ const ProductAppExtension = () => {
         }
 
         updatePromises.push(
-          fetch(`/api/products/${productId}`, {
+          fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updateData),

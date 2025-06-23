@@ -3,10 +3,12 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import ErrorMessage from '../../components/error';
 import Loading from '../../components/loading';
+import { useSession } from '../../context/session';
 
 const BundleDetailsPage = () => {
   const router = useRouter();
   const { id } = router.query;
+  const { context } = useSession();
 
   const [bundle, setBundle] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -15,11 +17,11 @@ const BundleDetailsPage = () => {
   const [direction, setDirection] = useState<TableSortDirection>('ASC');
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !context) return;
 
     const fetchBundle = async () => {
       try {
-        const res = await fetch(`/api/bundles/${id}`);
+        const res = await fetch(`/api/bundles/${id}?context=${encodeURIComponent(context)}`);
         const data = await res.json();
         setBundle(data);
       } catch (err) {
@@ -30,7 +32,7 @@ const BundleDetailsPage = () => {
     };
 
     fetchBundle();
-  }, [id]);
+  }, [id, context]);
 
   const handleSort = (newColumnHash: string, newDirection: TableSortDirection) => {
     setColumnHash(newColumnHash);

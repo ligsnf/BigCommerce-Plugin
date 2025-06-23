@@ -1,8 +1,10 @@
 const { bigcommerceClient } = require('../lib/auth');
+const { getStoreCredentials } = require('./db.js');
 
 async function initBundleCustomField() {
   try {
-    const bc = bigcommerceClient(process.env.ACCESS_TOKEN!, process.env.STORE_HASH!);
+    const { storeHash, accessToken } = await getStoreCredentials();
+    const bc = bigcommerceClient(accessToken, storeHash);
     
     // Check if the custom field already exists
     const { data: existingFields } = await bc.get('/catalog/products/custom-fields');
@@ -30,4 +32,4 @@ async function initBundleCustomField() {
 }
 
 // Run the initialization
-initBundleCustomField(); 
+initBundleCustomField();

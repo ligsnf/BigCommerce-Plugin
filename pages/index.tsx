@@ -47,9 +47,11 @@ export default function Home() {
   }, [context]);
 
   useEffect(() => {
+    if (!context) return;
+
     async function fetchData() {
       try {
-        const res = await fetch('/api/bundles/list');
+        const res = await fetch(`/api/bundles/list?context=${encodeURIComponent(context)}`);
         if (!res.ok) throw new Error('Failed to fetch data');
         const data = await res.json();
         setProducts(data.products);
@@ -62,7 +64,7 @@ export default function Home() {
     }
 
     fetchData();
-  }, []);
+  }, [context]);
 
   if (isLoading) return <Loading />;
   if (error) return <ErrorMessage error={error} />;

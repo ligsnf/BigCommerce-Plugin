@@ -16,9 +16,7 @@ const Products = () => {
     const [direction, setDirection] = useState<TableSortDirection>('ASC');
     const router = useRouter();
     const { context } = useSession();
-    const storeHash = process.env.NODE_ENV === 'development' 
-        ? process.env.STORE_HASH 
-        : context?.split('/')[1];
+    const storeHash = context ? JSON.parse(atob(context.split('.')[1])).context : null;
 
     useEffect(() => {
         // Log to browser console
