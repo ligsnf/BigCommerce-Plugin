@@ -2,282 +2,132 @@
 
 exports[`Homepage renders correctly 1`] = `
 <div
-  class="styled__StyledBox-sc-sj5f1m-0 dnUGcK styled__StyledPanel-sc-1h6ef3q-0 frQUTZ"
+  class="styled__StyledBox-sc-sj5f1m-0 heSvPQ"
 >
   <div
-    class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 dzErNZ"
+    class="styled__StyledBox-sc-sj5f1m-0 dnUGcK styled__StyledPanel-sc-1h6ef3q-0 frQUTZ"
   >
-    <h2
-      class="styled__StyledH2-sc-tqnj75-2 styled__StyledH2-sc-1h6ef3q-1 JBgla iAkOrm"
+    <h1
+      class="styled__StyledH1-sc-tqnj75-1 klUKKw"
     >
-      Bundle Products
-    </h2>
-  </div>
-  <div
-    class="styled__StyledBox-sc-sj5f1m-0 dJATMI styled__StyledFlex-sc-hcvk8l-0 ibZQvs"
-  >
-    <button
-      class="styled__StyledButton-sc-3yq204-0 kuKGmE bd-button"
-    >
-      <span
-        class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
-      >
-        Refresh Bundles
-      </span>
-    </button>
-  </div>
-  <div
-    class="styled__StyledBox-sc-sj5f1m-0 kqfsfW"
-  >
-    <h4
-      class="styled__StyledH4-sc-tqnj75-4 rUgdM"
-    >
-      Bundle: 
-      Sample Bundle 1
-    </h4>
-    <p
-      class="styled__StyledText-sc-tqnj75-5 fnzVjl"
-    >
-      ID: 
-      1
-    </p>
+      Product Management
+    </h1>
     <div
-      class="styled__StyledBox-sc-sj5f1m-0 dnUGcK styled__StyledPanel-sc-1h6ef3q-0 frQUTZ"
+      class="styled__StyledBox-sc-sj5f1m-0 etCLzn styled__StyledFlex-sc-hcvk8l-0 bTLtWP"
     >
       <div
-        class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 dzErNZ"
+        class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 dzErNZ styled__StyledTabs-sc-6je9le-0 hMmrKb"
+        role="tablist"
       >
-        <h2
-          class="styled__StyledH2-sc-tqnj75-2 styled__StyledH2-sc-1h6ef3q-1 JBgla iAkOrm"
+        <button
+          aria-controls="products-content"
+          aria-selected="true"
+          class="styled__StyledButton-sc-3yq204-0 hIozky styled__StyledTab-sc-6je9le-1 knoMum"
+          id="products"
+          role="tab"
+          tabindex="-1"
         >
-          Bundle Product Quantities
-        </h2>
+          <span
+            class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+          >
+            Products
+          </span>
+        </button>
+        <button
+          aria-controls="bundles-content"
+          aria-selected="false"
+          class="styled__StyledButton-sc-3yq204-0 hIozky styled__StyledTab-sc-6je9le-1 ermYJf"
+          id="bundles"
+          role="tab"
+          tabindex="0"
+        >
+          <span
+            class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
+          >
+            Bundles
+          </span>
+        </button>
       </div>
-      <form>
-        <div
-          class="styled__StyledBox-sc-sj5f1m-0 BRgwK"
-        >
-          <p
-            class="styled__StyledText-sc-tqnj75-5 fnzVjl"
-          >
-            Product ID: 
-            1
-          </p>
-          <div>
-            <span
-              class="styled__StyledInputWrapper-sc-g32raa-0 ivVOAe"
-            >
-              <div
-                class="styled__StyledInputContent-sc-g32raa-3 cklbdD"
-              >
-                <input
-                  class="styled__StyledInput-sc-g32raa-1 hdauTU"
-                  id=":r0:"
-                  min="1"
-                  type="number"
-                  value="1"
-                />
-              </div>
-            </span>
-          </div>
-        </div>
-        <div
-          class="styled__StyledBox-sc-sj5f1m-0 BRgwK"
-        >
-          <p
-            class="styled__StyledText-sc-tqnj75-5 fnzVjl"
-          >
-            Product ID: 
-            2
-          </p>
-          <div>
-            <span
-              class="styled__StyledInputWrapper-sc-g32raa-0 ivVOAe"
-            >
-              <div
-                class="styled__StyledInputContent-sc-g32raa-3 cklbdD"
-              >
-                <input
-                  class="styled__StyledInput-sc-g32raa-1 hdauTU"
-                  id=":r1:"
-                  min="1"
-                  type="number"
-                  value="2"
-                />
-              </div>
-            </span>
-          </div>
-        </div>
-        <div
-          class="styled__StyledBox-sc-sj5f1m-0 BRgwK"
-        >
-          <p
-            class="styled__StyledText-sc-tqnj75-5 fnzVjl"
-          >
-            Product ID: 
-            3
-          </p>
-          <div>
-            <span
-              class="styled__StyledInputWrapper-sc-g32raa-0 ivVOAe"
-            >
-              <div
-                class="styled__StyledInputContent-sc-g32raa-3 cklbdD"
-              >
-                <input
-                  class="styled__StyledInput-sc-g32raa-1 hdauTU"
-                  id=":r2:"
-                  min="1"
-                  type="number"
-                  value="1"
-                />
-              </div>
-            </span>
-          </div>
-        </div>
-        <div
-          class="styled__StyledBox-sc-sj5f1m-0 gPDrJc"
-        >
-          <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 bTLtWP"
-          >
-            <button
-              class="styled__StyledButton-sc-3yq204-0 jExzGK bd-button"
-              type="submit"
-            >
-              <span
-                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
-              >
-                Update Quantities
-              </span>
-            </button>
-            <button
-              class="styled__StyledButton-sc-3yq204-0 kuKGmE bd-button"
-              type="button"
-            >
-              <span
-                class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
-              >
-                Refresh Page
-              </span>
-            </button>
-          </div>
-        </div>
-      </form>
     </div>
-  </div>
-  <div
-    class="styled__StyledBox-sc-sj5f1m-0 kqfsfW"
-  >
-    <h4
-      class="styled__StyledH4-sc-tqnj75-4 rUgdM"
+    <table
+      class="styled__StyledTable-sc-xns2ns-1 kbgftC"
+      id=":r0:"
     >
-      Bundle: 
-      Sample Bundle 2
-    </h4>
-    <p
-      class="styled__StyledText-sc-tqnj75-5 fnzVjl"
-    >
-      ID: 
-      2
-    </p>
-    <div
-      class="styled__StyledBox-sc-sj5f1m-0 dnUGcK styled__StyledPanel-sc-1h6ef3q-0 frQUTZ"
-    >
-      <div
-        class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 dzErNZ"
+      <thead
+        class="styled__StyledTableHead-sc-1p8j1x-0"
       >
-        <h2
-          class="styled__StyledH2-sc-tqnj75-2 styled__StyledH2-sc-1h6ef3q-1 JBgla iAkOrm"
-        >
-          Bundle Product Quantities
-        </h2>
-      </div>
-      <form>
-        <div
-          class="styled__StyledBox-sc-sj5f1m-0 BRgwK"
-        >
-          <p
-            class="styled__StyledText-sc-tqnj75-5 fnzVjl"
+        <tr>
+          <th
+            class="styled__StyledTableHeaderCell-sc-1opnvtt-0 cDEKvS"
+            id="header-cell-0"
           >
-            Product ID: 
-            4
-          </p>
-          <div>
-            <span
-              class="styled__StyledInputWrapper-sc-g32raa-0 ivVOAe"
+            <div
+              class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 eYuALN styled__StyledFlex-sc-1opnvtt-2 kXIdGS"
             >
-              <div
-                class="styled__StyledInputContent-sc-g32raa-3 cklbdD"
-              >
-                <input
-                  class="styled__StyledInput-sc-g32raa-1 hdauTU"
-                  id=":r3:"
-                  min="1"
-                  type="number"
-                  value="1"
-                />
-              </div>
-            </span>
-          </div>
-        </div>
-        <div
-          class="styled__StyledBox-sc-sj5f1m-0 BRgwK"
-        >
-          <p
-            class="styled__StyledText-sc-tqnj75-5 fnzVjl"
+              Name
+            </div>
+          </th>
+          <th
+            class="styled__StyledTableHeaderCell-sc-1opnvtt-0 cDEKvS"
+            id="header-cell-1"
           >
-            Product ID: 
-            5
-          </p>
-          <div>
-            <span
-              class="styled__StyledInputWrapper-sc-g32raa-0 ivVOAe"
+            <div
+              class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 eYuALN styled__StyledFlex-sc-1opnvtt-2 kXIdGS"
             >
-              <div
-                class="styled__StyledInputContent-sc-g32raa-3 cklbdD"
-              >
-                <input
-                  class="styled__StyledInput-sc-g32raa-1 hdauTU"
-                  id=":r4:"
-                  min="1"
-                  type="number"
-                  value="1"
-                />
-              </div>
-            </span>
-          </div>
-        </div>
-        <div
-          class="styled__StyledBox-sc-sj5f1m-0 gPDrJc"
+              SKU
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody
+        class="styled__StyledTableBody-sc-1bwe2hn-0"
+      >
+        <tr
+          class="styled__StyledTableRow-sc-xq0hr0-0 iXHitD"
         >
-          <div
-            class="styled__StyledBox-sc-sj5f1m-0 BRgwK styled__StyledFlex-sc-hcvk8l-0 bTLtWP"
+          <td
+            class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
           >
             <button
-              class="styled__StyledButton-sc-3yq204-0 jExzGK bd-button"
-              type="submit"
+              class="styled__StyledButton-sc-3yq204-0 hIozky bd-button"
             >
               <span
                 class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
               >
-                Update Quantities
+                Product 1
               </span>
             </button>
+          </td>
+          <td
+            class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          >
+            SKU1
+          </td>
+        </tr>
+        <tr
+          class="styled__StyledTableRow-sc-xq0hr0-0 iXHitD"
+        >
+          <td
+            class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          >
             <button
-              class="styled__StyledButton-sc-3yq204-0 kuKGmE bd-button"
-              type="button"
+              class="styled__StyledButton-sc-3yq204-0 hIozky bd-button"
             >
               <span
                 class="styled__ContentWrapper-sc-3yq204-1 ihVQNH"
               >
-                Refresh Page
+                Product 2
               </span>
             </button>
-          </div>
-        </div>
-      </form>
-    </div>
+          </td>
+          <td
+            class="styled__StyledTableDataCell-sc-16y6nzi-0 eLbxfq"
+          >
+            SKU2
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>
 `;

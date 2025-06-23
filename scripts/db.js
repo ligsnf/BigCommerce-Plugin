@@ -145,6 +145,9 @@ async function syncProductsFromBigCommerce() {
   }  
 }
 
+// Export the function for use in other scripts
+export { getStoreCredentials };
+
 (async () => {
   try {
     await createTables();

@@ -1,15 +1,15 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from '../../../../lib/auth';
+import { getSession } from '@lib/auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const productId = req.query.productId;
+  const { productId, variantId } = req.query;
 
-  if (!productId || typeof productId !== 'string') {
-    return res.status(400).json({ message: 'Invalid product ID' });
+  if (!productId || typeof productId !== 'string' || !variantId || typeof variantId !== 'string') {
+    return res.status(400).json({ message: 'Invalid product ID or variant ID' });
   }
 
   const { accessToken, storeHash } = await getSession(req);
-  const baseUrl = `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/metafields`;
+  const baseUrl = `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/variants/${variantId}/metafields`;
 
   // GET: Retrieve metafields
   if (req.method === 'GET') {
@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       return res.status(200).json({ isBundle, linkedProductIds });
     } catch (err: any) {
-      console.error('[GET metafields] Error:', err);
+      console.error('[GET variant metafields] Error:', err);
 
       return res.status(500).json({ message: err.message });
     }
@@ -66,14 +66,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           value: isBundle.toString(),
           namespace: 'bundle',
           permission_set: 'app_only',
-          description: 'Whether this product is a bundle',
+          description: 'Whether this variant is a bundle',
         },
         {
           key: 'linked_product_ids',
           value: JSON.stringify(linkedProductIds ?? []),
           namespace: 'bundle',
           permission_set: 'app_only',
-          description: 'Array of product IDs linked in the bundle',
+          description: 'Array of product IDs linked in the variant bundle',
         }
       ];
 
@@ -82,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const existing = existingByKey[field.key];
           const method = existing ? 'PUT' : 'POST';
           const url = existing
-            ? `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/metafields/${existing.id}`
+            ? `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/variants/${variantId}/metafields/${existing.id}`
             : baseUrl;
 
           const response = await fetch(url, {
@@ -101,9 +101,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
       );
 
-      return res.status(200).json({ message: 'Metafields saved/updated', responses });
+      return res.status(200).json({ message: 'Variant metafields saved/updated', responses });
     } catch (err: any) {
-      console.error('[POST metafields] Error:', err);
+      console.error('[POST variant metafields] Error:', err);
 
       return res.status(500).json({ message: err.message });
     }
@@ -111,4 +111,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Method not allowed
   return res.status(405).setHeader('Allow', 'GET, POST').end('Method Not Allowed');
-}
+} 

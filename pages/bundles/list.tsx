@@ -4,13 +4,15 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import ErrorMessage from '../../components/error';
 import Loading from '../../components/loading';
-import { alertsManager } from '../../pages/_app';
+import { useSession } from '../../context/session';
+import { alertsManager } from '../../lib/alerts';
 
 const BundlesListPage = () => {
   const [bundles, setBundles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const router = useRouter();
+  const { context } = useSession();
 
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this bundle?')) {
@@ -18,7 +20,7 @@ const BundlesListPage = () => {
     }
 
     try {
-      const res = await fetch(`/api/bundles/${id}`, {
+      const res = await fetch(`/api/bundles/${id}?context=${encodeURIComponent(context)}`, {
         method: 'DELETE',
       });
 
@@ -60,9 +62,11 @@ const BundlesListPage = () => {
   );
   
   useEffect(() => {
+    if (!context) return;
+
     const fetchBundles = async () => {
       try {
-        const res = await fetch('/api/bundles/list');
+        const res = await fetch(`/api/bundles/list?context=${encodeURIComponent(context)}`);
         const data = await res.json();
         setBundles(data.bundles || []);
       } catch (err) {
@@ -73,7 +77,7 @@ const BundlesListPage = () => {
     };
 
     fetchBundles();
-  }, []);
+  }, [context]);
 
   if (isLoading) return <Loading />;
   if (error) return <ErrorMessage error={error} />;

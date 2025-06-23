@@ -35,13 +35,15 @@ import {
     const [customPrice, setCustomPrice] = useState<number | null>(initialData ? initialData.price : null);  
   
     const skuOptions: SKUOption[] = useMemo(
-      () =>
-        availableSKUs.map(({ sku, name, stock }) => ({
+      () => [
+        { value: '', content: 'Search and select SKU' },
+        ...availableSKUs.map(({ sku, name, stock }) => ({
           value: sku,
           content: stock > 0
             ? `${sku} - ${name} (${stock} in stock)`
             : `⚠️ ${sku} - ${name} (Out of stock)`,
         })),
+      ],
       [availableSKUs]
     );
     

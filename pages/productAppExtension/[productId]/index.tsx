@@ -1,22 +1,23 @@
 /* eslint-disable no-console */
-import {
-  Box,
-  Button,
-  H4,
-  Input,
-  Panel,
-  Small,
-  Switch,
-  Table,
-  Text,
-} from '@bigcommerce/big-design';
-import { CloseIcon } from '@bigcommerce/big-design-icons';
 import { useRouter } from 'next/router';
-import { useEffect, useMemo, useState } from 'react';
-import Select from 'react-select';
+import { useEffect, useState } from 'react';
+import BasicInfoPanel from '@components/BasicInfoPanel';
+import BundleSettingsPanel from '@components/BundleSettingsPanel';
 import ErrorMessage from '@components/error';
 import Loading from '@components/loading';
 import { useProductInfo, useProductList } from '@lib/hooks';
+
+interface Variant {
+  id: number;
+  sku: string;
+  option_values: Array<{ label: string }>;
+}
+
+interface Product {
+  name: string;
+  variants: Variant[];
+  sku: string;
+}
 
 const ProductAppExtension = () => {
   const router = useRouter();
@@ -24,42 +25,38 @@ const ProductAppExtension = () => {
   const context = router.query?.context as string;
 
   const { error, isLoading, product } = useProductInfo(productId);
-  const { name } = product ?? {};
+  const { name, variants = [] } = (product ?? { variants: [] }) as Product;
 
   const [isBundle, setIsBundle] = useState(false);
   const [linkedProducts, setLinkedProducts] = useState([]);
-  const [productQuantities, setProductQuantities] = useState({});
+  const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
   const { list = [], isLoading: isProductsLoading, error: productsError } = useProductList();
   const [saving, setSaving] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
+  const [variantLinkedProducts, setVariantLinkedProducts] = useState<Record<number, any[]>>({});
+  const [variantProductQuantities, setVariantProductQuantities] = useState<Record<number, Record<number, number>>>({});
 
   // Format available products for react-select (main products only)
-  const products = useMemo(() => {
-    return list
-      .filter(({ id, sku }) => {
-        // Exclude current product
-        if (id === productId) return false;
-        // Exclude products that are bundles (have BUN- prefix)
-        if (sku?.startsWith('BUN-')) return false;
+  const products = list
+    .filter(({ id, sku }) => {
+      if (id === productId) return false;
+      if (sku?.startsWith('BUN-')) return false;
 
-        return true;
-      })
-      .map(({ id, sku, name, price, inventory_level, variants, inventory_tracking }) => {
-        return {
-          value: id,
-          label: name,
-          sku,
-          variants: variants || [],
-          price,
-          inventory_level,
-          inventory_tracking
-        };
-      });
-  }, [list, productId]);
+      return true;
+    })
+    .map(({ id, sku, name, price, inventory_level, variants, inventory_tracking }) => ({
+      value: id,
+      label: name,
+      sku,
+      variants: variants || [],
+      price,
+      inventory_level,
+      inventory_tracking
+    }));
 
   // Create combined options for products and their SKUs
   const combinedOptions = products.reduce((acc, product) => {
-    // Add main product
     acc.push({
       value: `product-${product.value}`,
       label: `${product.label} [${product.sku}]`,
@@ -70,7 +67,6 @@ const ProductAppExtension = () => {
       inventory_tracking: product.inventory_tracking
     });
 
-    // Add variants only if there are multiple variants
     if (Array.isArray(product.variants) && product.variants.length > 1) {
       product.variants.forEach(variant => {
         const variantSku = variant.sku || variant.option_values?.map(ov => ov.label).join('-');
@@ -97,17 +93,13 @@ const ProductAppExtension = () => {
   const handleItemSelect = (selectedItem) => {
     if (!selectedItem) return;
 
-    // For variants, we need to check both the variant and product level
     const product = products.find(p => p.value === selectedItem.productId);
     if (!product) return;
 
-    // Check if product has multiple variants (more than 1)
     const hasMultipleVariants = product.variants && product.variants.length > 1;
-
-    // Check inventory tracking
     const hasInventoryTracking = selectedItem.isMainProduct
-      ? product.inventory_tracking === "product" // Main product enabled if product tracking
-      : hasMultipleVariants && product.inventory_tracking === "variant"; // Variants enabled only if multiple variants with variant tracking
+      ? product.inventory_tracking === "product"
+      : hasMultipleVariants && product.inventory_tracking === "variant";
 
     if (!hasInventoryTracking) {
       alert("This product/variant cannot be added to bundles because it has inventory tracking disabled.");
@@ -121,50 +113,183 @@ const ProductAppExtension = () => {
       selectedSku: selectedItem.sku,
       skuLabel: selectedItem.sku,
       label: selectedItem.label,
-      inventory_tracking: product.inventory_tracking
+      inventory_tracking: product.inventory_tracking,
+      variantId: selectedItem.variantId
     };
 
-    setLinkedProducts([...linkedProducts, newProduct]);
-    setProductQuantities(prev => ({
-      ...prev,
-      [product.value]: 1
-    }));
+    if (selectedVariant) {
+      // Add to variant bundle
+      setVariantLinkedProducts(prev => ({
+        ...prev,
+        [selectedVariant.id]: [...(prev[selectedVariant.id] || []), newProduct]
+      }));
+      setVariantProductQuantities(prev => ({
+        ...prev,
+        [selectedVariant.id]: {
+          ...(prev[selectedVariant.id] || {}),
+          [`${product.value}-${selectedItem.variantId}`]: 1
+        }
+      }));
+    } else {
+      // Add to main product bundle
+      setLinkedProducts([...linkedProducts, newProduct]);
+      setProductQuantities(prev => ({
+        ...prev,
+        [`${product.value}-${selectedItem.variantId}`]: 1
+      }));
+    }
 
-    // Reset selection
     setSelectedItem(null);
   };
 
-  // ✅ Load existing metafields on load
+  // Load existing metafields on load
   useEffect(() => {
     async function fetchMetafields() {
       if (!productId || products.length === 0) return;
 
       try {
-        const res = await fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`);
-        const data = await res.json();
+        const hasMultipleVariants = variants.length > 1;
+        console.log('Initial load - Product data:', {
+          productId,
+          hasMultipleVariants,
+          variants,
+          products
+        });
 
-        if (res.ok) {
-          setIsBundle(data.isBundle);
-          // First set the quantities to ensure they're available
-          setProductQuantities(data.productQuantities || {});
-          // Then set the linked products
-          setLinkedProducts(
-            data.linkedProductIds.map((id) => {
-              const match = products.find(p => p.value === id);
-              const product = match ?? { value: id, label: `Product ${id}` };
-              // Ensure each linked product has at least a quantity of 1
-              if (!data.productQuantities?.[id]) {
-                setProductQuantities(prev => ({
-                  ...prev,
-                  [id]: 1
-                }));
+        if (hasMultipleVariants) {
+          // Fetch metafields for each variant
+          const variantMetafieldsPromises = variants.map(async (variant) => {
+            const res = await fetch(`/api/productAppExtension/${productId}/variants/${variant.id}/metafields?context=${encodeURIComponent(context)}`);
+            if (!res.ok) {
+              console.warn(`Failed to load metafields for variant ${variant.id}:`, await res.text());
+
+              return null;
+            }
+
+            return res.json();
+          });
+
+          const variantMetafieldsResults = await Promise.all(variantMetafieldsPromises);
+          console.log('Variant metafields results:', variantMetafieldsResults);
+
+          // Process variant metafields
+          const variantData = {};
+          const variantQuantities = {};
+          const variantProducts = {};
+
+          variantMetafieldsResults.forEach((data, index) => {
+            if (data) {
+              const variantId = variants[index].id;
+              variantData[variantId] = data.isBundle;
+
+              // Map linked products with their quantities
+              variantProducts[variantId] = data.linkedProductIds.map((linkedProduct) => {
+                // Handle both old format (just ID) and new format (object with productId and variantId)
+                const productId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
+                const variantId = typeof linkedProduct === 'object' ? linkedProduct.variantId : null;
+                const quantity = typeof linkedProduct === 'object' ? linkedProduct.quantity : 1;
+
+                // First try to find a product with this variant ID
+                const productWithVariant = products.find(p =>
+                  p.variants && p.variants.some(v => v.id === variantId)
+                );
+
+                if (productWithVariant && variantId) {
+                  const variant = productWithVariant.variants.find(v => v.id === variantId);
+
+                  return {
+                    value: variantId,
+                    label: `${productWithVariant.label} [${variant.option_values.map(ov => ov.label).join(' - ')}]`,
+                    sku: variant.sku,
+                    skuLabel: variant.sku,
+                    productId: productWithVariant.value,
+                    variantId: variantId,
+                    quantity: quantity
+                  };
+                }
+
+                // Fallback to finding by product ID
+                const match = products.find(p => p.value === productId);
+
+                return match ? { ...match, quantity } : { value: productId, label: `Product ${productId}`, quantity };
+              });
+
+              // Set quantities from the linked products
+              variantQuantities[variantId] = Object.fromEntries(
+                variantProducts[variantId].map(p => [
+                  p.variantId ? `${p.productId}-${p.variantId}` : p.value.toString(),
+                  p.quantity
+                ])
+              );
+            }
+          });
+
+          console.log('Processed variant data:', {
+            variantData,
+            variantQuantities,
+            variantProducts
+          });
+
+          setVariantLinkedProducts(variantProducts);
+          setVariantProductQuantities(variantQuantities);
+
+          // Set isBundle based on whether any variant is a bundle
+          setIsBundle(Object.values(variantData).some(isBundle => isBundle));
+        } else {
+          // For products without variants, fetch product metafields
+          const res = await fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`);
+          const data = await res.json();
+          console.log('Product metafields data:', data);
+
+          if (res.ok) {
+            setIsBundle(data.isBundle);
+
+            // Map products with their quantities
+            const mappedProducts = data.linkedProductIds.map((linkedProduct) => {
+              // Handle both old format (just ID) and new format (object with productId and variantId)
+              const id = typeof linkedProduct === 'object' ? linkedProduct.variantId || linkedProduct.productId : linkedProduct;
+              const quantity = typeof linkedProduct === 'object' ? linkedProduct.quantity : 1;
+
+              // First try to find a product with this variant ID
+              const productWithVariant = products.find(p =>
+                p.variants && p.variants.some(v => v.id === id)
+              );
+
+              if (productWithVariant) {
+                const variant = productWithVariant.variants.find(v => v.id === id);
+
+                return {
+                  value: id,
+                  label: `${productWithVariant.label} [${variant.option_values.map(ov => ov.label).join(' - ')}]`,
+                  sku: variant.sku,
+                  skuLabel: variant.sku,
+                  productId: productWithVariant.value,
+                  variantId: id,
+                  quantity: quantity
+                };
               }
 
-              return product;
-            })
-          );
-        } else {
-          console.warn('Failed to load metafields:', data.message);
+              // Fallback to finding by product ID
+              const match = products.find(p => p.value === id);
+              const product = match ?? { value: id, label: `Product ${id}` };
+
+              return { ...product, quantity };
+            });
+
+            // Set quantities from the mapped products
+            const quantities = Object.fromEntries(
+              mappedProducts.map(p => [
+                p.variantId ? `${p.productId}-${p.variantId}` : p.value.toString(),
+                p.quantity
+              ])
+            );
+
+            setProductQuantities(quantities);
+            console.log('Mapped products for table:', mappedProducts);
+            setLinkedProducts(mappedProducts);
+          } else {
+            console.warn('Failed to load metafields:', data.message);
+          }
         }
       } catch (err) {
         console.error('Error fetching metafields:', err);
@@ -173,12 +298,34 @@ const ProductAppExtension = () => {
 
     fetchMetafields();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId, products]);
+  }, [productId, products.length, variants]);
 
   const handleQuantityChange = (productId, quantity) => {
+    // Find the product to get its variantId
+    const product = linkedProducts.find(p => p.value === productId);
+    if (!product) return;
+
+    const key = product.variantId ? `${product.productId}-${product.variantId}` : productId.toString();
     setProductQuantities(prev => ({
       ...prev,
-      [productId]: Math.max(1, parseInt(quantity) || 1)
+      [key]: Math.max(1, parseInt(quantity) || 1)
+    }));
+  };
+
+  const handleVariantQuantityChange = (variantId, productId, quantity) => {
+    setVariantProductQuantities(prev => ({
+      ...prev,
+      [variantId]: {
+        ...(prev[variantId] || {}),
+        [`${productId}-${variantId}`]: Math.max(1, parseInt(quantity) || 1)
+      }
+    }));
+  };
+
+  const handleVariantRemoveProduct = (variantId, productId) => {
+    setVariantLinkedProducts(prev => ({
+      ...prev,
+      [variantId]: (prev[variantId] || []).filter(p => p.value !== productId)
     }));
   };
 
@@ -186,87 +333,212 @@ const ProductAppExtension = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // If bundle is off or no products are linked, treat as not a bundle
-      const isActuallyBundle = isBundle && linkedProducts.length > 0;
+      const hasMultipleVariants = variants.length > 1;
+      const isActuallyBundle = isBundle && (
+        hasMultipleVariants
+          ? Object.values(variantLinkedProducts).every(products => products.length > 0)
+          : linkedProducts.length > 0
+      );
 
-      // Save metafields with quantities
-      const metafieldsRes = await fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Update product and variant SKUs
+      const updatePromises = [];
+
+      if (hasMultipleVariants) {
+        // Update each variant
+        for (const variant of variants) {
+          const currentSku = variant.sku || '';
+          const hasBunPrefix = currentSku.startsWith('BUN-');
+          let newSku = currentSku;
+
+          if (isActuallyBundle && !hasBunPrefix) {
+            newSku = `BUN-${currentSku}`;
+          } else if (!isActuallyBundle && hasBunPrefix) {
+            newSku = currentSku.replace('BUN-', '');
+          }
+
+          // Save metafields for each variant
+          const variantMetafieldsData = {
+            isBundle: isActuallyBundle,
+            linkedProductIds: isActuallyBundle ? (variantLinkedProducts[variant.id] || []).map((p) => {
+              const productId = p.productId || p.value;
+              const key = p.variantId ? `${productId}-${p.variantId}` : productId.toString();
+
+              return {
+                productId: productId,
+                variantId: p.variantId || null,
+                quantity: variantProductQuantities[variant.id]?.[key] || 1
+              };
+            }) : []
+          };
+
+          console.log(`Saving metafields for variant ${variant.id}:`, JSON.stringify(variantMetafieldsData, null, 2));
+
+          updatePromises.push(
+            fetch(`/api/productAppExtension/${productId}/variants/${variant.id}/metafields?context=${encodeURIComponent(context)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(variantMetafieldsData),
+            })
+          );
+
+          if (newSku !== currentSku) {
+            updatePromises.push(
+              fetch(`/api/products/${productId}/variants/${variant.id}?context=${encodeURIComponent(context)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sku: newSku,
+                  inventory_tracking: isActuallyBundle ? "variant" : "none"
+                }),
+              })
+            );
+          }
+
+          if (isActuallyBundle && variantLinkedProducts[variant.id]) {
+            // Calculate variant stock based on linked products
+            const stockLevels = await Promise.all(
+              variantLinkedProducts[variant.id].map(async (p) => {
+                const res = await fetch(`/api/products/${p.value}?context=${encodeURIComponent(context)}`);
+                if (!res.ok) {
+                  console.warn(`Failed to fetch stock for product ${p.value}`);
+
+                  return 0;
+                }
+                const data = await res.json();
+
+                // If the product has variants and we have a variant ID, get the specific variant's stock
+                if (data.variants && data.variants.length > 0 && p.variantId) {
+                  const variantRes = await fetch(`/api/products/${p.value}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
+                  if (!variantRes.ok) {
+                    console.warn(`Failed to fetch stock for variant ${p.variantId} of product ${p.value}`);
+
+                    return 0;
+                  }
+                  const variantData = await variantRes.json();
+                  const key = `${p.productId}-${p.variantId}`;
+
+                  return Math.floor((variantData.inventory_level ?? 0) / (productQuantities[key] || 1));
+                }
+
+                // For non-variant products or if we don't have a variant ID, use the product's stock
+                const key = p.variantId ? `${p.productId}-${p.variantId}` : p.value.toString();
+
+                return Math.floor((data.inventory_level ?? 0) / (productQuantities[key] || 1));
+              })
+            );
+
+            const minStock = Math.min(...stockLevels);
+            updatePromises.push(
+              fetch(`/api/products/${productId}/variants/${variant.id}?context=${encodeURIComponent(context)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  inventory_level: minStock
+                }),
+              })
+            );
+          }
+        }
+      } else {
+        // For products without variants, save at product level
+        const metafieldsData = {
           isBundle: isActuallyBundle,
-          linkedProductIds: linkedProducts.map((p) => p.value),
-          productQuantities
-        }),
-      });
+          linkedProductIds: linkedProducts.map((p) => {
+            // Ensure we have both productId and variantId
+            const productId = p.productId || p.value;
+            const key = p.variantId ? `${productId}-${p.variantId}` : productId.toString();
 
-      if (!metafieldsRes.ok) {
-        throw new Error(await metafieldsRes.text());
-      }
+            return {
+              productId: productId,
+              variantId: p.variantId || null,
+              quantity: productQuantities[key] || 1
+            };
+          })
+        };
 
-      // Update product SKU and inventory level
-      const currentSku = product?.sku || '';
-      const hasBunPrefix = currentSku.startsWith('BUN-');
-      let newSku = currentSku;
+        console.log('Saving metafields for main product:', JSON.stringify(metafieldsData, null, 2));
 
-      if (isActuallyBundle && !hasBunPrefix) {
-        newSku = `BUN-${currentSku}`;
-      } else if (!isActuallyBundle && hasBunPrefix) {
-        newSku = currentSku.replace('BUN-', '');
-      }
-
-      // Calculate minimum stock level for bundles and prepare update data
-      const updateData: any = {};
-
-      // Update SKU if changed
-      if (newSku !== currentSku) {
-        updateData.sku = newSku;
-      }
-
-      // Handle inventory based on bundle status
-      if (isActuallyBundle) {
-        // Fetch current stock levels from BigCommerce API
-        const stockLevels = await Promise.all(
-          linkedProducts.map(async (p) => {
-            const res = await fetch(`/api/products/${p.value}?context=${encodeURIComponent(context)}`);
-            if (!res.ok) {
-              console.warn(`Failed to fetch stock for product ${p.value}`);
-
-              return 0;
-            }
-            const data = await res.json();
-
-            // Consider quantity when calculating available bundles
-            return Math.floor((data.inventory_level ?? 0) / (productQuantities[p.value] || 1));
+        updatePromises.push(
+          fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(metafieldsData),
           })
         );
 
-        const minStock = Math.min(...stockLevels);
-        updateData.inventory_level = minStock;
-        updateData.inventory_tracking = "product";
-        updateData.is_visible = true;
-      } else {
-        // Reset inventory settings when not a bundle
-        updateData.inventory_tracking = "none";
-        updateData.inventory_level = null;
+        // Update main product
+        const currentSku = product?.sku || '';
+        const hasBunPrefix = currentSku.startsWith('BUN-');
+        let newSku = currentSku;
+
+        if (isActuallyBundle && !hasBunPrefix) {
+          newSku = `BUN-${currentSku}`;
+        } else if (!isActuallyBundle && hasBunPrefix) {
+          newSku = currentSku.replace('BUN-', '');
+        }
+
+        const updateData: any = {};
+
+        if (newSku !== currentSku) {
+          updateData.sku = newSku;
+        }
+
+        if (isActuallyBundle) {
+          const stockLevels = await Promise.all(
+            linkedProducts.map(async (p) => {
+              // Use productId for fetching the product, not the variant ID
+              const productId = p.productId || p.value;
+              const res = await fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`);
+              if (!res.ok) {
+                console.warn(`Failed to fetch stock for product ${productId}`);
+
+                return 0;
+              }
+              const data = await res.json();
+
+              // If the product has variants and we have a variant ID, get the specific variant's stock
+              if (data.variants && data.variants.length > 0 && p.variantId) {
+                const variantRes = await fetch(`/api/products/${productId}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
+                if (!variantRes.ok) {
+                  console.warn(`Failed to fetch stock for variant ${p.variantId} of product ${productId}`);
+
+                  return 0;
+                }
+                const variantData = await variantRes.json();
+                const key = `${productId}-${p.variantId}`;
+
+                return Math.floor((variantData.inventory_level ?? 0) / (productQuantities[key] || 1));
+              }
+
+              // For non-variant products or if we don't have a variant ID, use the product's stock
+              const key = p.variantId ? `${productId}-${p.variantId}` : productId.toString();
+
+              return Math.floor((data.inventory_level ?? 0) / (productQuantities[key] || 1));
+            })
+          );
+
+          const minStock = Math.min(...stockLevels);
+          updateData.inventory_level = minStock;
+          updateData.inventory_tracking = "product";
+          updateData.is_visible = true;
+        } else {
+          updateData.inventory_tracking = "none";
+          updateData.inventory_level = null;
+        }
+
+        updatePromises.push(
+          fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData),
+          })
+        );
       }
 
-      console.log("Updating with data:", updateData);
+      await Promise.all(updatePromises);
 
-      // Make API call to update product
-      const updateProductRes = await fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData),
-      });
-
-      if (!updateProductRes.ok) {
-        throw new Error(await updateProductRes.text());
-      }
-
-      // Show appropriate success message
       if (isActuallyBundle) {
-        alert(`Product has been saved as a bundle with ${linkedProducts.length} product(s).`);
+        alert(`Product has been saved as a bundle${hasMultipleVariants ? ' with variant-level bundling' : ''}.`);
       } else {
         alert('Product has been saved as a regular product (not a bundle).');
       }
@@ -283,119 +555,28 @@ const ProductAppExtension = () => {
 
   return (
     <>
-      <Panel header="Basic Information" marginBottom="small">
-        <H4>Product name</H4>
-        <Text>{name}</Text>
-      </Panel>
-
-      <Panel header="Bundle Settings">
-        <Box marginBottom="medium">
-          <H4>Is this product a bundle?</H4>
-          <Switch
-            checked={isBundle}
-            onChange={() => setIsBundle((prev) => !prev)}
-          />
-        </Box>
-
-        {isBundle && (
-          <Box marginBottom="medium">
-            <H4>Select products and quantities for this bundle</H4>
-
-            <Box marginBottom="medium">
-              <Select
-                isSearchable
-                options={combinedOptions.filter(option =>
-                  // Filter out products that are already linked
-                  !linkedProducts.find(lp => lp.selectedSku === option.sku)
-                )}
-                value={selectedItem}
-                onChange={handleItemSelect}
-                placeholder="Search and select a product or SKU..."
-                noOptionsMessage={() => "No products available. Note: Products must have inventory tracking enabled to be added to bundles."}
-                formatOptionLabel={(option) => {
-                  const product = products.find(p => p.value === option.productId);
-                  const hasMultipleVariants = product?.variants && product.variants.length > 1;
-                  const hasInventoryTracking = option.isMainProduct
-                    ? product?.inventory_tracking === "product"
-                    : hasMultipleVariants && product?.inventory_tracking === "variant";
-
-                  return (
-                    <div style={{
-                      opacity: hasInventoryTracking ? 1 : 0.5,
-                      color: hasInventoryTracking ? "inherit" : "#666"
-                    }}>
-                      {option.label}
-                      {!hasInventoryTracking && (
-                        <Small color="secondary" style={{ marginLeft: "8px" }}>
-                          (Inventory tracking disabled)
-                        </Small>
-                      )}
-                    </div>
-                  );
-                }}
-              />
-              <Small marginTop="small" color="secondary">
-                Note: Only products with inventory tracking enabled can be added to bundles.
-              </Small>
-            </Box>
-
-            {/* Bundle Items Table */}
-            <Box marginTop="medium">
-              {linkedProducts.length > 0 && (
-                <Table
-                  columns={[
-                    { header: 'Product', hash: 'product', render: ({ label }) => label },
-                    { header: 'SKU', hash: 'sku', render: ({ skuLabel }) => skuLabel },
-                    {
-                      header: 'Quantity',
-                      hash: 'quantity',
-                      width: '200px',
-                      render: ({ value }) => (
-                        <Input
-                          type="number"
-                          min="1"
-                          value={productQuantities[value] || 1}
-                          onChange={(e) => handleQuantityChange(value, e.target.value)}
-                          style={{ width: '120px' }}
-                        />
-                      )
-                    },
-                    {
-                      header: '',
-                      hash: 'actions',
-                      width: '50px',
-                      render: ({ value }) => (
-                        <button
-                          onClick={() => setLinkedProducts(linkedProducts.filter(p => p.value !== value))}
-                          style={{
-                            border: 'none',
-                            background: 'none',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            color: '#D92D20'
-                          }}
-                        >
-                          <CloseIcon />
-                        </button>
-                      )
-                    }
-                  ]}
-                  items={linkedProducts}
-                />
-              )}
-            </Box>
-          </Box>
-        )}
-
-        <Button
-          isLoading={saving}
-          disabled={saving}
-          onClick={handleSave}
-          marginTop="medium"
-        >
-          Save
-        </Button>
-      </Panel>
+      <BasicInfoPanel name={name} />
+      <BundleSettingsPanel
+        isBundle={isBundle}
+        onBundleToggle={() => setIsBundle(prev => !prev)}
+        combinedOptions={combinedOptions}
+        selectedItem={selectedItem}
+        onItemSelect={handleItemSelect}
+        linkedProducts={linkedProducts}
+        products={products}
+        productQuantities={productQuantities}
+        onQuantityChange={handleQuantityChange}
+        onRemoveProduct={(productId) => setLinkedProducts(linkedProducts.filter(p => p.value !== productId))}
+        onSave={handleSave}
+        saving={saving}
+        variants={variants}
+        selectedVariant={selectedVariant}
+        onVariantSelect={setSelectedVariant}
+        variantLinkedProducts={variantLinkedProducts}
+        variantProductQuantities={variantProductQuantities}
+        onVariantQuantityChange={handleVariantQuantityChange}
+        onVariantRemoveProduct={handleVariantRemoveProduct}
+      />
     </>
   );
 };

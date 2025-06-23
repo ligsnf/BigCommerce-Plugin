@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import CreateBundleForm from '../../../components/createBundleForm';
 import ErrorMessage from '../../../components/error';
 import Loading from '../../../components/loading';
-import { alertsManager } from '../../_app';
+import { useSession } from '../../../context/session';
+import { alertsManager } from '../../../lib/alerts';
 
 const EditBundlePage = () => {
   const router = useRouter();
   const { id } = router.query;
+  const { context } = useSession();
 
   const [bundleData, setBundleData] = useState(null);
   const [products, setProducts] = useState([]);
@@ -16,13 +18,13 @@ const EditBundlePage = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !context) return;
   
     const fetchData = async () => {
       try {
         const [bundleRes, productsRes] = await Promise.all([
-          fetch(`/api/bundles/${id}`),
-          fetch('/api/bundles/products'),
+          fetch(`/api/bundles/${id}?context=${encodeURIComponent(context)}`),
+          fetch(`/api/bundles/products?context=${encodeURIComponent(context)}`),
         ]);
   
         const bundle = await bundleRes.json();
@@ -38,10 +40,10 @@ const EditBundlePage = () => {
     };
   
     fetchData();
-  }, [id]);
+  }, [id, context]);
 
   const handleSubmit = async (bundle) => {
-    const res = await fetch(`/api/bundles/${id}`, {
+    const res = await fetch(`/api/bundles/${id}?context=${encodeURIComponent(context)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(bundle),
