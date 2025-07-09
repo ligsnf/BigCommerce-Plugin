@@ -10,10 +10,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('✅ Webhook received:', JSON.stringify(req.body, null, 2));
 
     const order = req.body.data;
-    const storeHash = req.body.store_id; // BigCommerce sends store_id in webhook payload
+    // Extract store hash from producer field (format: "stores/7wt5mizwwn")
+    const storeHash = req.body.producer?.split('/')[1];
+    const storeId = req.body.store_id; // Keep for logging
 
     if (!order || !storeHash) {
       console.error('❌ Missing order or storeHash in webhook payload');
+      console.error('Producer:', req.body.producer);
+      console.error('Store ID:', req.body.store_id);
 
       return res.status(400).json({ message: 'Missing required information' });
     }
@@ -22,7 +26,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const accessToken = await db.getStoreToken(storeHash);
 
     if (!accessToken) {
-      console.error(`❌ No access token found for store ${storeHash}`);
+      console.error(`❌ No access token found for store hash: ${storeHash}`);
+      console.error(`Store ID from webhook: ${storeId}`);
 
       return res.status(401).json({ message: 'Store not authorized' });
     }
