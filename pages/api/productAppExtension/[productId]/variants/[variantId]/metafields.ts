@@ -62,6 +62,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         existingFields.map((field: any) => [field.key, field])
       );
 
+      // Extract product IDs and quantities from the complex objects
+      const productIds = linkedProductIds?.map(item => 
+        typeof item === 'object' ? item.productId : item
+      ) ?? [];
+      
+      const quantities = linkedProductIds?.map(item => 
+        typeof item === 'object' ? item.quantity : 1
+      ) ?? [];
+
       const metafields = [
         {
           key: 'is_bundle',
@@ -72,14 +81,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         {
           key: 'linked_product_ids',
-          value: JSON.stringify(linkedProductIds ?? []),
+          value: JSON.stringify(productIds),
           namespace: 'bundle',
           permission_set: 'app_only',
           description: 'Array of product IDs linked in the variant bundle',
         },
         {
           key: 'product_quantities',
-          value: JSON.stringify(linkedProductIds?.map(() => 1) ?? []),
+          value: JSON.stringify(quantities),
           namespace: 'bundle',
           permission_set: 'app_only',
           description: 'Array of quantities for each linked product in the variant bundle',

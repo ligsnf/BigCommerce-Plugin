@@ -129,8 +129,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log(`📊 Product quantities:`, productQuantities);
             
             // Update stock for each product in the bundle
-            for (const linkedId of linkedProductIds) {
-              const quantity = productQuantities[linkedId] || 1;
+            for (let i = 0; i < linkedProductIds.length; i++) {
+              const linkedId = linkedProductIds[i];
+              const quantity = productQuantities[i] || 1;
               const totalQuantity = orderedQuantity * quantity;
               
               const { data: linkedProduct } = await bc.get(`/catalog/products/${linkedId}`);
@@ -168,8 +169,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log(`📊 Product quantities:`, productQuantities);
             
             // Update stock for each product in the bundle
-            for (const linkedId of linkedProductIds) {
-              const quantity = productQuantities[linkedId] || 1;
+            for (let i = 0; i < linkedProductIds.length; i++) {
+              const linkedId = linkedProductIds[i];
+              const quantity = productQuantities[i] || 1;
               const totalQuantity = orderedQuantity * quantity;
               
               const { data: linkedProduct } = await bc.get(`/catalog/products/${linkedId}`);
