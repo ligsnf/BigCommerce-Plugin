@@ -52,6 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const orderDetails = await orderProductsRes.json();
+    console.log(`📋 Order details:`, JSON.stringify(orderDetails, null, 2));
 
     // Get all products that are bundles
     const { data: allProducts } = await bc.get('/catalog/products');
@@ -105,12 +106,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const variantId = item.variant_id;
       const orderedQuantity = item.quantity;
 
-      console.log(`🔍 Processing ordered product ${productId}${variantId ? ` variant ${variantId}` : ''}...`);
+      console.log(`🔍 Processing ordered product ${productId}${variantId ? ` variant ${variantId}` : ''} with quantity ${orderedQuantity}...`);
       
       // Check if the ordered item is a variant bundle
       if (variantId) {
+        console.log(`🔍 Checking if variant ${variantId} is a bundle...`);
         const { data: variantMetafields } = await bc.get(`/catalog/products/${productId}/variants/${variantId}/metafields`);
+        console.log(`📋 Variant metafields:`, JSON.stringify(variantMetafields, null, 2));
+        
         const isVariantBundle = variantMetafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
+        console.log(`🔍 Is variant bundle? ${isVariantBundle}`);
 
         if (isVariantBundle) {
           console.log(`📦 Variant ${variantId} is a bundle`);
@@ -120,6 +125,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (linkedField && productQuantitiesField) {
             const linkedProductIds = JSON.parse(linkedField.value);
             const productQuantities = JSON.parse(productQuantitiesField.value);
+            console.log(`🔗 Linked product IDs:`, linkedProductIds);
+            console.log(`📊 Product quantities:`, productQuantities);
             
             // Update stock for each product in the bundle
             for (const linkedId of linkedProductIds) {
@@ -134,12 +141,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 inventory_level: newStock
               });
             }
+          } else {
+            console.log(`⚠️ Missing linked_product_ids or product_quantities for variant bundle`);
           }
+        } else {
+          console.log(`📦 Variant ${variantId} is NOT a bundle`);
         }
       } else {
         // Check if the ordered item is a product bundle
+        console.log(`🔍 Checking if product ${productId} is a bundle...`);
         const { data: itemMetafields } = await bc.get(`/catalog/products/${productId}/metafields`);
+        console.log(`📋 Product metafields:`, JSON.stringify(itemMetafields, null, 2));
+        
         const isProductBundle = itemMetafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
+        console.log(`🔍 Is product bundle? ${isProductBundle}`);
 
         if (isProductBundle) {
           console.log(`📦 Product ${productId} is a bundle`);
@@ -149,6 +164,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (linkedField && productQuantitiesField) {
             const linkedProductIds = JSON.parse(linkedField.value);
             const productQuantities = JSON.parse(productQuantitiesField.value);
+            console.log(`🔗 Linked product IDs:`, linkedProductIds);
+            console.log(`📊 Product quantities:`, productQuantities);
             
             // Update stock for each product in the bundle
             for (const linkedId of linkedProductIds) {
@@ -163,8 +180,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 inventory_level: newStock
               });
             }
+          } else {
+            console.log(`⚠️ Missing linked_product_ids or product_quantities for product bundle`);
           }
         } else {
+          console.log(`📦 Product ${productId} is NOT a bundle`);
+          
           // Handle individual product purchase - update affected bundles
           console.log(`📦 Product ${productId} is an individual item`);
           
