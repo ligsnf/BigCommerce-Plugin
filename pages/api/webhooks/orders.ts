@@ -5,15 +5,10 @@ import db from '../../../lib/db';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end('Method Not Allowed');
 
-  console.log('=== WEBHOOK RECEIVED ===');
-  console.log('Headers:', req.headers);
-  console.log('Body:', JSON.stringify(req.body, null, 2));
-
   try {
     const order = req.body.data;
     // Extract store hash from producer field (format: "stores/7wt5mizwwn")
     const storeHash = req.body.producer?.split('/')[1];
-    const storeId = req.body.store_id; // Keep for logging
 
     if (!order || !storeHash) {
       return res.status(400).json({ message: 'Missing required information' });
@@ -28,8 +23,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const bc = bigcommerceClient(accessToken, storeHash);
     const orderId = order.id;
-
-    console.log(`Processing order ${orderId} for store ${storeHash}`);
 
     // Fetch order products using V2 API manually
     const orderProductsRes = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${orderId}/products`, {
@@ -46,7 +39,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const orderDetails = await orderProductsRes.json();
-    console.log('Order details:', orderDetails);
 
     // Get all products that are bundles
     const { data: allProducts } = await bc.get('/catalog/products');
@@ -64,7 +56,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         if (linkedField) {
           const linkedProductIds = JSON.parse(linkedField.value);
-          console.log(`Product ${product.id} bundle data:`, linkedProductIds);
           
           bundleProducts.push({
             id: product.id,
@@ -84,7 +75,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           if (linkedField) {
             const linkedProductIds = JSON.parse(linkedField.value);
-            console.log(`Variant ${variant.id} bundle data:`, linkedProductIds);
             
             bundleVariants.push({
               productId: product.id,
@@ -102,8 +92,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const variantId = item.variant_id;
       const orderedQuantity = item.quantity;
       
-      console.log(`Processing order item: Product ${productId}, Variant ${variantId}, Quantity ${orderedQuantity}`);
-      
       // Check if the ordered item is a variant bundle
       if (variantId) {
         const { data: variantMetafields } = await bc.get(`/catalog/products/${productId}/variants/${variantId}/metafields`);
@@ -111,12 +99,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const isVariantBundle = variantMetafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
 
         if (isVariantBundle) {
-          console.log(`Variant ${variantId} is a bundle, updating linked products`);
           const linkedField = variantMetafields.find(f => f.key === 'linked_product_ids' && f.namespace === 'bundle');
           
           if (linkedField) {
             const linkedProductIds = JSON.parse(linkedField.value);
-            console.log(`Variant bundle linked products:`, linkedProductIds);
             
             // Update stock for each product in the bundle
             for (const linkedProduct of linkedProductIds) {
@@ -127,14 +113,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               
               const totalQuantity = orderedQuantity * quantity;
               
-              console.log(`Updating product ${targetProductId}${targetVariantId ? ` variant ${targetVariantId}` : ''}: quantity ${quantity}, total ${totalQuantity}`);
-              
               if (targetVariantId) {
                 // Update variant stock
                 const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
                 const newStock = Math.max(0, linkedVariant.inventory_level - totalQuantity);
-                
-                console.log(`Variant ${targetVariantId} stock: ${linkedVariant.inventory_level} -> ${newStock}`);
                 
                 await bc.put(`/catalog/products/${targetProductId}/variants/${targetVariantId}`, {
                   inventory_level: newStock
@@ -144,8 +126,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const { data: linkedProduct } = await bc.get(`/catalog/products/${targetProductId}`);
                 const newStock = Math.max(0, linkedProduct.inventory_level - totalQuantity);
                 
-                console.log(`Product ${targetProductId} stock: ${linkedProduct.inventory_level} -> ${newStock}`);
-                
                 await bc.put(`/catalog/products/${targetProductId}`, {
                   inventory_level: newStock
                 });
@@ -153,7 +133,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
         } else {
-          console.log(`Variant ${variantId} is not a bundle, checking if it affects any bundles`);
           // Handle individual variant purchase - update affected bundles
           await updateAffectedBundles(productId, orderedQuantity, bundleProducts, bundleVariants, bc);
         }
@@ -164,12 +143,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const isProductBundle = itemMetafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
 
         if (isProductBundle) {
-          console.log(`Product ${productId} is a bundle, updating linked products`);
           const linkedField = itemMetafields.find(f => f.key === 'linked_product_ids' && f.namespace === 'bundle');
           
           if (linkedField) {
             const linkedProductIds = JSON.parse(linkedField.value);
-            console.log(`Product bundle linked products:`, linkedProductIds);
             
             // Update stock for each product in the bundle
             for (const linkedProduct of linkedProductIds) {
@@ -180,14 +157,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               
               const totalQuantity = orderedQuantity * quantity;
               
-              console.log(`Updating product ${targetProductId}${targetVariantId ? ` variant ${targetVariantId}` : ''}: quantity ${quantity}, total ${totalQuantity}`);
-              
               if (targetVariantId) {
                 // Update variant stock
                 const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
                 const newStock = Math.max(0, linkedVariant.inventory_level - totalQuantity);
-                
-                console.log(`Variant ${targetVariantId} stock: ${linkedVariant.inventory_level} -> ${newStock}`);
                 
                 await bc.put(`/catalog/products/${targetProductId}/variants/${targetVariantId}`, {
                   inventory_level: newStock
@@ -197,8 +170,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const { data: linkedProduct } = await bc.get(`/catalog/products/${targetProductId}`);
                 const newStock = Math.max(0, linkedProduct.inventory_level - totalQuantity);
                 
-                console.log(`Product ${targetProductId} stock: ${linkedProduct.inventory_level} -> ${newStock}`);
-                
                 await bc.put(`/catalog/products/${targetProductId}`, {
                   inventory_level: newStock
                 });
@@ -206,7 +177,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
         } else {
-          console.log(`Product ${productId} is not a bundle, checking if it affects any bundles`);
           // Handle individual product purchase - update affected bundles
           await updateAffectedBundles(productId, orderedQuantity, bundleProducts, bundleVariants, bc);
         }
@@ -215,8 +185,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.status(200).json({ message: 'Stock levels updated successfully' });
   } catch (err: any) {
-    console.error('Webhook error:', err);
-    console.error('Error details:', err.response?.data || err.message);
     res.status(500).json({ message: 'Internal Server Error', error: err.message });
   }
 }
@@ -239,8 +207,6 @@ async function updateAffectedBundles(productId: number, orderedQuantity: number,
     })
   );
   
-  console.log(`Product ${productId} affects ${affectedBundles.length} product bundles and ${affectedVariantBundles.length} variant bundles`);
-  
   // Update product bundles
   for (const bundle of affectedBundles) {
     let minPossibleBundles = Infinity;
@@ -260,8 +226,6 @@ async function updateAffectedBundles(productId: number, orderedQuantity: number,
         minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
       }
     }
-    
-    console.log(`Updating bundle product ${bundle.id} inventory to ${minPossibleBundles}`);
     
     await bc.put(`/catalog/products/${bundle.id}`, {
       inventory_level: minPossibleBundles
@@ -287,8 +251,6 @@ async function updateAffectedBundles(productId: number, orderedQuantity: number,
         minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
       }
     }
-    
-    console.log(`Updating bundle variant ${bundle.variantId} inventory to ${minPossibleBundles}`);
     
     await bc.put(`/catalog/products/${bundle.productId}/variants/${bundle.variantId}`, {
       inventory_level: minPossibleBundles
