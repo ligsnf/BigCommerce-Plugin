@@ -195,6 +195,7 @@ async function updateAffectedBundles(productId: number, orderedQuantity: number,
   const affectedBundles = bundleProducts.filter(bundle => 
     bundle.linkedProductIds.some((linkedProduct: any) => {
       const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
+
       return targetProductId === productId;
     })
   );
@@ -203,6 +204,7 @@ async function updateAffectedBundles(productId: number, orderedQuantity: number,
   const affectedVariantBundles = bundleVariants.filter(bundle => 
     bundle.linkedProductIds.some((linkedProduct: any) => {
       const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
+      
       return targetProductId === productId;
     })
   );
