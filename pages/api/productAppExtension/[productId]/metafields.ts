@@ -27,8 +27,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const isBundle = data.find(f => f.key === 'is_bundle')?.value === 'true';
       const linkedIdsRaw = data.find(f => f.key === 'linked_product_ids')?.value;
       const linkedProductIds = linkedIdsRaw ? JSON.parse(linkedIdsRaw) : [];
+      const quantitiesRaw = data.find(f => f.key === 'product_quantities')?.value;
+      const productQuantities = quantitiesRaw ? JSON.parse(quantitiesRaw) : [];
 
-      return res.status(200).json({ isBundle, linkedProductIds });
+      return res.status(200).json({ isBundle, linkedProductIds, productQuantities });
     } catch (err: any) {
       console.error('[GET metafields] Error:', err);
 
@@ -60,6 +62,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         existingFields.map((field: any) => [field.key, field])
       );
 
+      // Extract product IDs and quantities from the complex objects
+      const productIds = linkedProductIds?.map(item => 
+        typeof item === 'object' ? item.productId : item
+      ) ?? [];
+      
+      const quantities = linkedProductIds?.map(item => 
+        typeof item === 'object' ? item.quantity : 1
+      ) ?? [];
+
       const metafields = [
         {
           key: 'is_bundle',
@@ -70,10 +81,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         {
           key: 'linked_product_ids',
-          value: JSON.stringify(linkedProductIds ?? []),
+          value: JSON.stringify(productIds),
           namespace: 'bundle',
           permission_set: 'app_only',
           description: 'Array of product IDs linked in the bundle',
+        },
+        {
+          key: 'product_quantities',
+          value: JSON.stringify(quantities),
+          namespace: 'bundle',
+          permission_set: 'app_only',
+          description: 'Array of quantities for each linked product in the bundle',
         }
       ];
 
