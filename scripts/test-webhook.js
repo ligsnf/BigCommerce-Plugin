@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import 'dotenv/config';
-import { ensureWebhookExists, listWebhooks } from '../lib/webhooks.js';
+import { ensureWebhookExists, listWebhooks } from '../lib/webhooks.ts';
 import { getStoreCredentials } from './db.js';
 
 async function testWebhookManagement() {

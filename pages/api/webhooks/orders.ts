@@ -149,7 +149,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           if (linkedField) {
             const linkedProductIds = JSON.parse(linkedField.value);
-            
+            console.log('Processing bundle purchase:', { productId, orderedQuantity, linkedProductIds });
             // Update stock for each product in the bundle
             for (const linkedProduct of linkedProductIds) {
               // Handle both old format (just ID) and new format (object with productId, variantId, quantity)
@@ -158,6 +158,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               const quantity = typeof linkedProduct === 'object' ? linkedProduct.quantity : 1;
               
               const totalQuantity = orderedQuantity * quantity;
+              console.log('Updating stock for linked product:', { targetProductId, targetVariantId, quantity, orderedQuantity, totalQuantity });
               
               if (targetVariantId) {
                 // Update variant stock
