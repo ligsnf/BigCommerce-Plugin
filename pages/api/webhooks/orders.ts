@@ -63,6 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const bc = bigcommerceClient(accessToken, storeHash);
     const orderId = order.id;
+    console.log('[Bundle Debug] Order ID:', orderId);
 
     // Fetch order products using V2 API manually
     const orderProductsRes = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${orderId}/products`, {
