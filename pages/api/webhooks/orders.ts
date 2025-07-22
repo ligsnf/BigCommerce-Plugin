@@ -45,6 +45,7 @@ async function updateInventory(targetProductId: number, targetVariantId: number 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end('Method Not Allowed');
 
+  console.log('[Bundle Debug] Orders webhook received');
   try {
     const order = req.body.data;
     // Extract store hash from producer field (format: "stores/7wt5mizwwn")
