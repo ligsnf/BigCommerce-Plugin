@@ -26,11 +26,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const isBundle = data.find(f => f.key === 'is_bundle')?.value === 'true';
       const linkedIdsRaw = data.find(f => f.key === 'linked_product_ids')?.value;
-      const linkedProductIds = linkedIdsRaw ? JSON.parse(linkedIdsRaw) : [];
-      const quantitiesRaw = data.find(f => f.key === 'product_quantities')?.value;
-      const productQuantities = quantitiesRaw ? JSON.parse(quantitiesRaw) : [];
+      let linkedProductIds = linkedIdsRaw ? JSON.parse(linkedIdsRaw) : [];
+      // Normalize: always return array of { productId, variantId, quantity }
+      linkedProductIds = linkedProductIds.map(item => {
+        if (typeof item === 'object' && item !== null) {
+          return {
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            quantity: item.quantity ?? 1
+          };
+        } else {
+          return {
+            productId: item,
+            variantId: null,
+            quantity: 1
+          };
+        }
+      });
 
-      return res.status(200).json({ isBundle, linkedProductIds, productQuantities });
+      return res.status(200).json({ isBundle, linkedProductIds });
     } catch (err: any) {
       console.error('[GET variant metafields] Error:', err);
 
@@ -62,14 +76,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         existingFields.map((field: any) => [field.key, field])
       );
 
-      // Extract product IDs and quantities from the complex objects
-      const productIds = linkedProductIds?.map(item => 
-        typeof item === 'object' ? item.productId : item
-      ) ?? [];
-      
-      const quantities = linkedProductIds?.map(item => 
-        typeof item === 'object' ? item.quantity : 1
-      ) ?? [];
+      // Ensure all entries are objects with productId, variantId, quantity
+      const normalizedLinkedProductIds = (linkedProductIds ?? []).map(item => {
+        if (typeof item === 'object' && item !== null) {
+          return {
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            quantity: item.quantity ?? 1
+          };
+        } else {
+          return {
+            productId: item,
+            variantId: null,
+            quantity: 1
+          };
+        }
+      });
 
       const metafields = [
         {
@@ -81,17 +103,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         {
           key: 'linked_product_ids',
-          value: JSON.stringify(productIds),
+          value: JSON.stringify(normalizedLinkedProductIds),
           namespace: 'bundle',
           permission_set: 'app_only',
-          description: 'Array of product IDs linked in the variant bundle',
-        },
-        {
-          key: 'product_quantities',
-          value: JSON.stringify(quantities),
-          namespace: 'bundle',
-          permission_set: 'app_only',
-          description: 'Array of quantities for each linked product in the variant bundle',
+          description: 'Array of product/variant objects in the variant bundle',
         }
       ];
 

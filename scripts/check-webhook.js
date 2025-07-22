@@ -4,7 +4,7 @@ import axios from 'axios';
 
 // You can set these as environment variables or hardcode for quick testing
 const storeHash = process.env.BC_STORE_HASH || '7wt5mizwwn';
-const accessToken = process.env.BC_ACCESS_TOKEN || 'nnikw7gtfck4miecop0ox5h163qnmbx';
+const accessToken = process.env.BC_ACCESS_TOKEN || 'eg689reagabbe3yql32w16jqxnpzvi2';
 
 async function checkWebhooks() {
   try {
