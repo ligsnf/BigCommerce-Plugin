@@ -142,9 +142,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log('[Bundle Debug] No linkedProductIds found for variant bundle');
           }
         } else {
-          console.log('[Bundle Debug] Variant is not a bundle. Updating affected bundles.');
-          // Handle individual variant purchase - update affected bundles
-          await updateAffectedBundles(productId, orderedQuantity, bundleProducts, bundleVariants, bc);
+          // If the variant is not a bundle, check if the parent product is a bundle
+          const { isBundle: isProductBundle, linkedProductIds: productLinkedProductIds } = await getProductBundleInfo(productId, bc);
+          console.log(`[Bundle Debug] Variant is not a bundle. Parent product isBundle:`, isProductBundle, 'linkedProductIds:', productLinkedProductIds);
+
+          if (isProductBundle && productLinkedProductIds) {
+            // Update stock for each product in the parent product bundle
+            for (const linkedProduct of productLinkedProductIds) {
+              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
+              const totalQuantity = orderedQuantity * quantity;
+              console.log('[Bundle Debug] Updating inventory for linked product bundle (from variant order):', { targetProductId, targetVariantId, quantity, orderedQuantity, totalQuantity });
+              await updateInventory(targetProductId, targetVariantId, totalQuantity, bc);
+            }
+          } else {
+            // Handle individual variant purchase - update affected bundles
+            console.log('[Bundle Debug] Variant and parent product are not bundles. Updating affected bundles.');
+            await updateAffectedBundles(productId, orderedQuantity, bundleProducts, bundleVariants, bc);
+          }
         }
       } else {
         // Check if the ordered item is a product bundle
@@ -255,3 +269,4 @@ async function updateAffectedBundles(productId: number, orderedQuantity: number,
     console.log('[Bundle Debug] BigCommerce PUT bundle variant response:', bundleVariantResponse);
   }
 }
+// TODO: Add a function to update inventory when a product is deleted from bigcommerce
