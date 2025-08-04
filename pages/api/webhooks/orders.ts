@@ -8,6 +8,7 @@ async function getProductBundleInfo(productId: number, bc: any) {
   const isBundle = metafields.find((f: any) => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
   const linkedField = metafields.find((f: any) => f.key === 'linked_product_ids' && f.namespace === 'bundle');
   const linkedProductIds = linkedField ? JSON.parse(linkedField.value) : [];
+  
   return { isBundle, linkedProductIds };
 }
 
@@ -17,11 +18,13 @@ async function getVariantBundleInfo(productId: number, variantId: number, bc: an
   const isBundle = metafields.find((f: any) => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
   const linkedField = metafields.find((f: any) => f.key === 'linked_product_ids' && f.namespace === 'bundle');
   const linkedProductIds = linkedField ? JSON.parse(linkedField.value) : [];
+
   return { isBundle, linkedProductIds };
 }
 
 // Utility to parse linked product info
 function parseLinkedProduct(linkedProduct: any) {
+
   return {
     productId: typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct,
     variantId: typeof linkedProduct === 'object' ? linkedProduct.variantId : null,
@@ -34,10 +37,12 @@ async function updateInventory(targetProductId: number, targetVariantId: number 
   if (targetVariantId) {
     const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
     const newStock = Math.max(0, linkedVariant.inventory_level - totalQuantity);
+
     return await bc.put(`/catalog/products/${targetProductId}/variants/${targetVariantId}`, { inventory_level: newStock });
   } else {
     const { data: linkedProduct } = await bc.get(`/catalog/products/${targetProductId}`);
     const newStock = Math.max(0, linkedProduct.inventory_level - totalQuantity);
+
     return await bc.put(`/catalog/products/${targetProductId}`, { inventory_level: newStock });
   }
 }
@@ -52,6 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const storeHash = req.body.producer?.split('/')[1];
 
     if (!order || !storeHash) {
+
       return res.status(400).json({ message: 'Missing required information' });
     }
 
@@ -59,6 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const accessToken = await db.getStoreToken(storeHash);
 
     if (!accessToken) {
+
       return res.status(401).json({ message: 'Store not authorized' });
     }
 
@@ -201,6 +208,7 @@ async function updateAffectedBundles(productId: number, orderedQuantity: number,
   const affectedBundles = bundleProducts.filter(bundle => 
     bundle.linkedProductIds.some((linkedProduct: any) => {
       const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
+
       return targetProductId === productId;
     })
   );
@@ -210,6 +218,7 @@ async function updateAffectedBundles(productId: number, orderedQuantity: number,
   const affectedVariantBundles = bundleVariants.filter(bundle => 
     bundle.linkedProductIds.some((linkedProduct: any) => {
       const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
+
       return targetProductId === productId;
     })
   );
