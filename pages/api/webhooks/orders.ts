@@ -1,19 +1,62 @@
-/* eslint-disable no-console */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { bigcommerceClient } from '../../../lib/auth';
 import db from '../../../lib/db';
 
+// Utility to get bundle info for a product
+async function getProductBundleInfo(productId: number, bc: any) {
+  const { data: metafields } = await bc.get(`/catalog/products/${productId}/metafields`);
+  const isBundle = metafields.find((f: any) => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
+  const linkedField = metafields.find((f: any) => f.key === 'linked_product_ids' && f.namespace === 'bundle');
+  const linkedProductIds = linkedField ? JSON.parse(linkedField.value) : [];
+  
+  return { isBundle, linkedProductIds };
+}
+
+// Utility to get bundle info for a variant
+async function getVariantBundleInfo(productId: number, variantId: number, bc: any) {
+  const { data: metafields } = await bc.get(`/catalog/products/${productId}/variants/${variantId}/metafields`);
+  const isBundle = metafields.find((f: any) => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
+  const linkedField = metafields.find((f: any) => f.key === 'linked_product_ids' && f.namespace === 'bundle');
+  const linkedProductIds = linkedField ? JSON.parse(linkedField.value) : [];
+
+  return { isBundle, linkedProductIds };
+}
+
+// Utility to parse linked product info
+function parseLinkedProduct(linkedProduct: any) {
+
+  return {
+    productId: typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct,
+    variantId: typeof linkedProduct === 'object' ? linkedProduct.variantId : null,
+    quantity: typeof linkedProduct === 'object' ? linkedProduct.quantity : 1,
+  };
+}
+
+// Utility to update inventory for a product or variant
+async function updateInventory(targetProductId: number, targetVariantId: number | null, totalQuantity: number, bc: any) {
+  if (targetVariantId) {
+    const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
+    const newStock = Math.max(0, linkedVariant.inventory_level - totalQuantity);
+
+    return await bc.put(`/catalog/products/${targetProductId}/variants/${targetVariantId}`, { inventory_level: newStock });
+  } else {
+    const { data: linkedProduct } = await bc.get(`/catalog/products/${targetProductId}`);
+    const newStock = Math.max(0, linkedProduct.inventory_level - totalQuantity);
+
+    return await bc.put(`/catalog/products/${targetProductId}`, { inventory_level: newStock });
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end('Method Not Allowed');
 
+  console.log('[Bundle Debug] Orders webhook received');
   try {
-    console.log('✅ Webhook received:', JSON.stringify(req.body, null, 2));
-
     const order = req.body.data;
-    const storeHash = req.body.store_id; // BigCommerce sends store_id in webhook payload
+    // Extract store hash from producer field (format: "stores/7wt5mizwwn")
+    const storeHash = req.body.producer?.split('/')[1];
 
     if (!order || !storeHash) {
-      console.error('❌ Missing order or storeHash in webhook payload');
 
       return res.status(400).json({ message: 'Missing required information' });
     }
@@ -22,15 +65,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const accessToken = await db.getStoreToken(storeHash);
 
     if (!accessToken) {
-      console.error(`❌ No access token found for store ${storeHash}`);
 
       return res.status(401).json({ message: 'Store not authorized' });
     }
 
     const bc = bigcommerceClient(accessToken, storeHash);
     const orderId = order.id;
-
-    console.log(`📦 Fetching products for order ID ${orderId} via V2...`);
+    console.log('[Bundle Debug] Order ID:', orderId);
 
     // Fetch order products using V2 API manually
     const orderProductsRes = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${orderId}/products`, {
@@ -50,46 +91,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get all products that are bundles
     const { data: allProducts } = await bc.get('/catalog/products');
+    console.log('[Bundle Debug] Fetched all products:', allProducts.length);
     const bundleProducts = [];
     const bundleVariants = [];
     
     // Find all bundles and their details
     for (const product of allProducts) {
       // Check product-level metafields
-      const { data: productMetafields } = await bc.get(`/catalog/products/${product.id}/metafields`);
-      const isProductBundle = productMetafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
+      const { isBundle: isProductBundle, linkedProductIds: productLinkedProductIds } = await getProductBundleInfo(product.id, bc);
+      console.log(`[Bundle Debug] Product ${product.id} isBundle:`, isProductBundle, 'linkedProductIds:', productLinkedProductIds);
       
       if (isProductBundle) {
-        const linkedField = productMetafields.find(f => f.key === 'linked_product_ids' && f.namespace === 'bundle');
-        const productQuantitiesField = productMetafields.find(f => f.key === 'product_quantities' && f.namespace === 'bundle');
-        
-        if (linkedField && productQuantitiesField) {
-          bundleProducts.push({
-            id: product.id,
-            linkedProductIds: JSON.parse(linkedField.value),
-            productQuantities: JSON.parse(productQuantitiesField.value)
-          });
-        }
+        bundleProducts.push({
+          id: product.id,
+          linkedProductIds: productLinkedProductIds
+        });
       }
 
       // Check variant-level metafields
       const { data: variants } = await bc.get(`/catalog/products/${product.id}/variants`);
       for (const variant of variants) {
-        const { data: variantMetafields } = await bc.get(`/catalog/products/${product.id}/variants/${variant.id}/metafields`);
-        const isVariantBundle = variantMetafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
+        const { isBundle: isVariantBundle, linkedProductIds: variantLinkedProductIds } = await getVariantBundleInfo(product.id, variant.id, bc);
+        console.log(`[Bundle Debug] Variant ${variant.id} of Product ${product.id} isBundle:`, isVariantBundle, 'linkedProductIds:', variantLinkedProductIds);
         
         if (isVariantBundle) {
-          const linkedField = variantMetafields.find(f => f.key === 'linked_product_ids' && f.namespace === 'bundle');
-          const productQuantitiesField = variantMetafields.find(f => f.key === 'product_quantities' && f.namespace === 'bundle');
-          
-          if (linkedField && productQuantitiesField) {
-            bundleVariants.push({
-              productId: product.id,
-              variantId: variant.id,
-              linkedProductIds: JSON.parse(linkedField.value),
-              productQuantities: JSON.parse(productQuantitiesField.value)
-            });
-          }
+          bundleVariants.push({
+            productId: product.id,
+            variantId: variant.id,
+            linkedProductIds: variantLinkedProductIds
+          });
         }
       }
     }
@@ -99,123 +129,153 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const productId = item.product_id;
       const variantId = item.variant_id;
       const orderedQuantity = item.quantity;
-
-      console.log(`🔍 Processing ordered product ${productId}${variantId ? ` variant ${variantId}` : ''}...`);
+      console.log(`[Bundle Debug] Processing order item:`, { productId, variantId, orderedQuantity });
       
       // Check if the ordered item is a variant bundle
       if (variantId) {
-        const { data: variantMetafields } = await bc.get(`/catalog/products/${productId}/variants/${variantId}/metafields`);
-        const isVariantBundle = variantMetafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
+        const { isBundle: isVariantBundle, linkedProductIds: variantLinkedProductIds } = await getVariantBundleInfo(productId, variantId, bc);
+        console.log(`[Bundle Debug] Order item is variant. isVariantBundle:`, isVariantBundle, 'linkedProductIds:', variantLinkedProductIds);
 
         if (isVariantBundle) {
-          console.log(`📦 Variant ${variantId} is a bundle`);
-          const linkedField = variantMetafields.find(f => f.key === 'linked_product_ids' && f.namespace === 'bundle');
-          const productQuantitiesField = variantMetafields.find(f => f.key === 'product_quantities' && f.namespace === 'bundle');
-          
-          if (linkedField && productQuantitiesField) {
-            const linkedProductIds = JSON.parse(linkedField.value);
-            const productQuantities = JSON.parse(productQuantitiesField.value);
-            
+          if (variantLinkedProductIds) {
             // Update stock for each product in the bundle
-            for (const linkedId of linkedProductIds) {
-              const quantity = productQuantities[linkedId] || 1;
+            for (const linkedProduct of variantLinkedProductIds) {
+              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
               const totalQuantity = orderedQuantity * quantity;
-              
-              const { data: linkedProduct } = await bc.get(`/catalog/products/${linkedId}`);
-              const newStock = Math.max(0, linkedProduct.inventory_level - totalQuantity);
-              
-              console.log(`📉 Reducing stock for bundled product ${linkedId}: ${linkedProduct.inventory_level} → ${newStock}`);
-              await bc.put(`/catalog/products/${linkedId}`, {
-                inventory_level: newStock
-              });
+              console.log(`[Bundle Debug] Updating inventory for linked variant bundle:`, { targetProductId, targetVariantId, quantity, orderedQuantity, totalQuantity });
+              await updateInventory(targetProductId, targetVariantId, totalQuantity, bc);
             }
+          } else {
+            console.log('[Bundle Debug] No linkedProductIds found for variant bundle');
+          }
+        } else {
+          // If the variant is not a bundle, check if the parent product is a bundle
+          const { isBundle: isProductBundle, linkedProductIds: productLinkedProductIds } = await getProductBundleInfo(productId, bc);
+          console.log(`[Bundle Debug] Variant is not a bundle. Parent product isBundle:`, isProductBundle, 'linkedProductIds:', productLinkedProductIds);
+
+          if (isProductBundle && productLinkedProductIds) {
+            // Update stock for each product in the parent product bundle
+            for (const linkedProduct of productLinkedProductIds) {
+              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
+              const totalQuantity = orderedQuantity * quantity;
+              console.log('[Bundle Debug] Updating inventory for linked product bundle (from variant order):', { targetProductId, targetVariantId, quantity, orderedQuantity, totalQuantity });
+              await updateInventory(targetProductId, targetVariantId, totalQuantity, bc);
+            }
+          } else {
+            // Handle individual variant purchase - update affected bundles
+            console.log('[Bundle Debug] Variant and parent product are not bundles. Updating affected bundles.');
+            await updateAffectedBundles(productId, orderedQuantity, bundleProducts, bundleVariants, bc);
           }
         }
       } else {
         // Check if the ordered item is a product bundle
-        const { data: itemMetafields } = await bc.get(`/catalog/products/${productId}/metafields`);
-        const isProductBundle = itemMetafields.find(f => f.key === 'is_bundle' && f.namespace === 'bundle')?.value === 'true';
-
+        const { isBundle: isProductBundle, linkedProductIds: productLinkedProductIds } = await getProductBundleInfo(productId, bc);
+        console.log(`[Bundle Debug] Order item is product. isProductBundle:`, isProductBundle, 'linkedProductIds:', productLinkedProductIds);
+        
         if (isProductBundle) {
-          console.log(`📦 Product ${productId} is a bundle`);
-          const linkedField = itemMetafields.find(f => f.key === 'linked_product_ids' && f.namespace === 'bundle');
-          const productQuantitiesField = itemMetafields.find(f => f.key === 'product_quantities' && f.namespace === 'bundle');
-          
-          if (linkedField && productQuantitiesField) {
-            const linkedProductIds = JSON.parse(linkedField.value);
-            const productQuantities = JSON.parse(productQuantitiesField.value);
-            
+          if (productLinkedProductIds) {
+            console.log('[Bundle Debug] Processing bundle purchase:', { productId, orderedQuantity, linkedProductIds: productLinkedProductIds });
             // Update stock for each product in the bundle
-            for (const linkedId of linkedProductIds) {
-              const quantity = productQuantities[linkedId] || 1;
+            for (const linkedProduct of productLinkedProductIds) {
+              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
               const totalQuantity = orderedQuantity * quantity;
-              
-              const { data: linkedProduct } = await bc.get(`/catalog/products/${linkedId}`);
-              const newStock = Math.max(0, linkedProduct.inventory_level - totalQuantity);
-              
-              console.log(`📉 Reducing stock for bundled product ${linkedId}: ${linkedProduct.inventory_level} → ${newStock}`);
-              await bc.put(`/catalog/products/${linkedId}`, {
-                inventory_level: newStock
-              });
+              console.log('[Bundle Debug] Updating inventory for linked product bundle:', { targetProductId, targetVariantId, quantity, orderedQuantity, totalQuantity });
+              await updateInventory(targetProductId, targetVariantId, totalQuantity, bc);
             }
+          } else {
+            console.log('[Bundle Debug] No linkedProductIds found for product bundle');
           }
         } else {
+          console.log('[Bundle Debug] Product is not a bundle. Updating affected bundles.');
           // Handle individual product purchase - update affected bundles
-          console.log(`📦 Product ${productId} is an individual item`);
-          
-          // Find and update all product bundles that contain this product
-          const affectedBundles = bundleProducts.filter(bundle => 
-            bundle.linkedProductIds.includes(productId)
-          );
-          
-          // Find and update all variant bundles that contain this product
-          const affectedVariantBundles = bundleVariants.filter(bundle => 
-            bundle.linkedProductIds.includes(productId)
-          );
-          
-          console.log(`🔍 Found ${affectedBundles.length} product bundles and ${affectedVariantBundles.length} variant bundles containing product ${productId}`);
-          
-          // Update product bundles
-          for (const bundle of affectedBundles) {
-            let minPossibleBundles = Infinity;
-            
-            for (const linkedId of bundle.linkedProductIds) {
-              const { data: linkedProduct } = await bc.get(`/catalog/products/${linkedId}`);
-              const quantityNeeded = bundle.productQuantities[linkedId] || 1;
-              const possibleBundles = Math.floor(linkedProduct.inventory_level / quantityNeeded);
-              minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-            }
-            
-            console.log(`📊 Updating product bundle ${bundle.id} stock to ${minPossibleBundles}`);
-            await bc.put(`/catalog/products/${bundle.id}`, {
-              inventory_level: minPossibleBundles
-            });
-          }
-
-          // Update variant bundles
-          for (const bundle of affectedVariantBundles) {
-            let minPossibleBundles = Infinity;
-            
-            for (const linkedId of bundle.linkedProductIds) {
-              const { data: linkedProduct } = await bc.get(`/catalog/products/${linkedId}`);
-              const quantityNeeded = bundle.productQuantities[linkedId] || 1;
-              const possibleBundles = Math.floor(linkedProduct.inventory_level / quantityNeeded);
-              minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-            }
-            
-            console.log(`📊 Updating variant bundle ${bundle.variantId} stock to ${minPossibleBundles}`);
-            await bc.put(`/catalog/products/${bundle.productId}/variants/${bundle.variantId}`, {
-              inventory_level: minPossibleBundles
-            });
-          }
+          await updateAffectedBundles(productId, orderedQuantity, bundleProducts, bundleVariants, bc);
         }
       }
     }
 
-    console.log('✅ Inventory updates completed.');
     res.status(200).json({ message: 'Stock levels updated successfully' });
   } catch (err: any) {
-    console.error('[Webhook] ❌ Error processing order:', err.message);
-    res.status(500).json({ message: 'Internal Server Error' });
+    console.error('Webhook error:', err);
+    console.error('Error details:', err.response?.data || err.message);
+    res.status(500).json({ message: 'Internal Server Error', error: err.message });
   }
 }
+
+// Helper function to update affected bundles
+async function updateAffectedBundles(productId: number, orderedQuantity: number, bundleProducts: any[], bundleVariants: any[], bc: any) {
+  console.log('[Bundle Debug] updateAffectedBundles called for productId:', productId, 'orderedQuantity:', orderedQuantity);
+  // Find and update all product bundles that contain this product
+  const affectedBundles = bundleProducts.filter(bundle => 
+    bundle.linkedProductIds.some((linkedProduct: any) => {
+      const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
+
+      return targetProductId === productId;
+    })
+  );
+  console.log('[Bundle Debug] Affected product bundles:', affectedBundles.map(b => b.id));
+  
+  // Find and update all variant bundles that contain this product
+  const affectedVariantBundles = bundleVariants.filter(bundle => 
+    bundle.linkedProductIds.some((linkedProduct: any) => {
+      const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
+
+      return targetProductId === productId;
+    })
+  );
+  console.log('[Bundle Debug] Affected variant bundles:', affectedVariantBundles.map(b => ({ productId: b.productId, variantId: b.variantId })));
+  
+  // Update product bundles
+  for (const bundle of affectedBundles) {
+    let minPossibleBundles = Infinity;
+    console.log('[Bundle Debug] Calculating minPossibleBundles for product bundle:', bundle.id);
+    for (const linkedProduct of bundle.linkedProductIds) {
+      const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
+      const targetVariantId = typeof linkedProduct === 'object' ? linkedProduct.variantId : null;
+      const quantityNeeded = typeof linkedProduct === 'object' ? linkedProduct.quantity : 1;
+      console.log('[Bundle Debug] Linked product in bundle:', { targetProductId, targetVariantId, quantityNeeded });
+      if (targetVariantId) {
+        const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
+        const possibleBundles = Math.floor(linkedVariant.inventory_level / quantityNeeded);
+        minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
+        console.log('[Bundle Debug] Variant inventory:', linkedVariant.inventory_level, 'possibleBundles:', possibleBundles);
+      } else {
+        const { data: linkedProductObj } = await bc.get(`/catalog/products/${targetProductId}`);
+        const possibleBundles = Math.floor(linkedProductObj.inventory_level / quantityNeeded);
+        minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
+        console.log('[Bundle Debug] Product inventory:', linkedProductObj.inventory_level, 'possibleBundles:', possibleBundles);
+      }
+    }
+    const bundleProductResponse = await bc.put(`/catalog/products/${bundle.id}`, {
+      inventory_level: minPossibleBundles
+    });
+    console.log('[Bundle Debug] BigCommerce PUT bundle product response:', bundleProductResponse);
+  }
+
+  // Update variant bundles
+  for (const bundle of affectedVariantBundles) {
+    let minPossibleBundles = Infinity;
+    console.log('[Bundle Debug] Calculating minPossibleBundles for variant bundle:', { productId: bundle.productId, variantId: bundle.variantId });
+    for (const linkedProduct of bundle.linkedProductIds) {
+      const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
+      const targetVariantId = typeof linkedProduct === 'object' ? linkedProduct.variantId : null;
+      const quantityNeeded = typeof linkedProduct === 'object' ? linkedProduct.quantity : 1;
+      console.log('[Bundle Debug] Linked product in variant bundle:', { targetProductId, targetVariantId, quantityNeeded });
+      if (targetVariantId) {
+        const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
+        const possibleBundles = Math.floor(linkedVariant.inventory_level / quantityNeeded);
+        minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
+        console.log('[Bundle Debug] Variant inventory:', linkedVariant.inventory_level, 'possibleBundles:', possibleBundles);
+      } else {
+        const { data: linkedProductObj } = await bc.get(`/catalog/products/${targetProductId}`);
+        const possibleBundles = Math.floor(linkedProductObj.inventory_level / quantityNeeded);
+        minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
+        console.log('[Bundle Debug] Product inventory:', linkedProductObj.inventory_level, 'possibleBundles:', possibleBundles);
+      }
+    }
+    const bundleVariantResponse = await bc.put(`/catalog/products/${bundle.productId}/variants/${bundle.variantId}`, {
+      inventory_level: minPossibleBundles
+    });
+    console.log('[Bundle Debug] BigCommerce PUT bundle variant response:', bundleVariantResponse);
+  }
+}
+// TODO: Add a function to update inventory when a product is deleted from bigcommerce

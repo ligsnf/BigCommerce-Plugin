@@ -13,14 +13,13 @@
     "db:setup": "node scripts/db.js",
     "db:start": "docker compose up -d",
     "db:stop": "docker compose down",
-    "create-webhook": "node create-webhook.js"
+    "create-webhook": "node scripts/create-webhook.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": ">=14 <20",
-    "npm": ">=7.20.x <9"
+    "node": "22.x"
   },
   "dependencies": {
     "@bigcommerce/big-design": "^0.36.0",
