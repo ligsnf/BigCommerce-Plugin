@@ -147,3 +147,37 @@ In production, you must build and run optimized version of the code. Use the fol
 npm run build
 npm run start -p 3000
 ```
+
+## Chrome extension sidebar injection
+
+You can run the app as a sidebar injected into BigCommerce product edit pages via a Chrome extension.
+
+### Files
+
+- `extension/manifest.json`
+- `extension/background.js`
+- `extension/content.js`
+- `extension/options.html`
+- `extension/options.js`
+
+### What it does
+
+- Adds a browser action. Clicking the extension icon dispatches a `BC_SIDEBAR_TOGGLE` event in the active tab.
+- A content script listens for that event, creates a fixed-position sidebar `<iframe>`, and loads the app's product page UI at `/<app>/productAppExtension/{productId}?context=<JWT>`.
+- The sidebar is only active on `https://store-*.mybigcommerce.com/manage/products/*` pages.
+
+### Setup
+
+1. Build and run this app somewhere accessible (e.g., `https://your-app.example.com`).
+2. Launch the app from within BigCommerce once so the URL contains `?context=<JWT>`. Copy the `context` value.
+3. In Chrome visit `chrome://extensions`, enable Developer mode, click "Load unpacked" and select the `extension/` folder.
+4. Open the extension's Options page and set:
+   - App Base URL: your app's public URL (e.g., `https://your-app.example.com`)
+   - Context JWT: the `context` you copied
+5. Go to a BigCommerce product edit page, then click the extension icon to toggle the sidebar.
+
+### Notes
+
+- The iframe points to `pages/productAppExtension/[productId]/index.tsx`, which already expects a `context` query.
+- If the store context rotates, update the JWT in the extension options.
+- The content script watches DOM changes and updates the iframe URL if you navigate to a different product while the sidebar is open.

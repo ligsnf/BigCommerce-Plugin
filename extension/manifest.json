@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "BigCommerce Product Sidebar Injector",
+  "version": "0.1.0",
+  "description": "Toggle and inject the app's sidebar into BigCommerce product edit pages.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://*.mybigcommerce.com/manage/products/*"
+  ],
+  "action": {
+    "default_title": "Toggle Sidebar"
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.mybigcommerce.com/manage/products/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
+
