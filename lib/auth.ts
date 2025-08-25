@@ -58,14 +58,18 @@ export function setSession(session: SessionProps) {
 }
 
 export async function getSession(req: NextApiRequest) {
-    // ✅ Local dev fallback — bypass JWT check
-    // if (process.env.NODE_ENV === 'development') {
-    //     return {
-    //         accessToken: process.env.ACCESS_TOKEN,
-    //         storeHash: process.env.STORE_HASH,
-    //         user: { id: 1, email: 'dev@localhost', username: 'dev' }, // optional dummy user
-    //     };
-    // }
+    // ✅ Local dev fallback — bypass JWT/context check when env vars are set
+    if (
+        (process.env.DEV_BC_BYPASS === '1' || process.env.NODE_ENV === 'development') &&
+        process.env.ACCESS_TOKEN &&
+        process.env.STORE_HASH
+    ) {
+        return {
+            accessToken: process.env.ACCESS_TOKEN,
+            storeHash: process.env.STORE_HASH,
+            user: { id: 1, email: 'dev@localhost', username: 'dev' },
+        };
+    }
 
     const encodedContext = req.query?.context;
     if (typeof encodedContext !== 'string') {

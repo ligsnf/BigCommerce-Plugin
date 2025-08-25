@@ -3,6 +3,7 @@ import BundleItemsTable from './BundleItemsTable';
 import ProductSelector from './ProductSelector';
 
 interface BundleSettingsPanelProps {
+  header?: string;
   isBundle: boolean;
   onBundleToggle: () => void;
   combinedOptions: any[];
@@ -25,6 +26,7 @@ interface BundleSettingsPanelProps {
 }
 
 const BundleSettingsPanel = ({
+  header,
   isBundle,
   onBundleToggle,
   combinedOptions,
@@ -59,7 +61,7 @@ const BundleSettingsPanel = ({
   };
 
   return (
-    <Panel header="Bundle Settings">
+    <Panel header={header}>
       <Box marginBottom="medium">
         <H4>Is this product a bundle?</H4>
         <Switch

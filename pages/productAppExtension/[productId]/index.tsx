@@ -1,7 +1,6 @@
 /* eslint-disable no-console */
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import BasicInfoPanel from '@components/BasicInfoPanel';
 import BundleSettingsPanel from '@components/BundleSettingsPanel';
 import ErrorMessage from '@components/error';
 import Loading from '@components/loading';
@@ -36,12 +35,50 @@ const ProductAppExtension = () => {
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
   const [variantLinkedProducts, setVariantLinkedProducts] = useState<Record<number, any[]>>({});
   const [variantProductQuantities, setVariantProductQuantities] = useState<Record<number, Record<number, number>>>({});
+  const [bundleProductIds, setBundleProductIds] = useState<Set<number>>(new Set());
+  const [bundleVariantIds, setBundleVariantIds] = useState<Set<number>>(new Set());
+
+  // Fetch bundles (by metafields) to exclude them from selection
+  useEffect(() => {
+    async function fetchBundles() {
+      try {
+        const res = await fetch(`/api/bundles/list?context=${encodeURIComponent(context)}`);
+        if (!res.ok) {
+          // eslint-disable-next-line no-console
+          console.warn('Failed to load bundles list:', await res.text());
+          
+          return;
+        }
+        const data = await res.json();
+        const productIds = new Set<number>();
+        const variantIds = new Set<number>();
+
+        (data.bundles || []).forEach((b: any) => {
+          if (b.isVariant) {
+            if (typeof b.variantId === 'number') variantIds.add(b.variantId);
+          } else {
+            if (typeof b.id === 'number') productIds.add(b.id);
+          }
+        });
+
+        setBundleProductIds(productIds);
+        setBundleVariantIds(variantIds);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('Error fetching bundles list:', e);
+      }
+    }
+
+    if (context) {
+      fetchBundles();
+    }
+  }, [context]);
 
   // Format available products for react-select (main products only)
   const products = list
-    .filter(({ id, sku }) => {
+    .filter(({ id }) => {
       if (id === productId) return false;
-      if (sku?.startsWith('BUN-')) return false;
+      if (bundleProductIds.has(id)) return false;
 
       return true;
     })
@@ -59,7 +96,7 @@ const ProductAppExtension = () => {
   const combinedOptions = products.reduce((acc, product) => {
     acc.push({
       value: `product-${product.value}`,
-      label: `${product.label} [${product.sku}]`,
+      label: `${product.sku}: ${product.label}`,
       productId: product.value,
       sku: product.sku,
       isMainProduct: true,
@@ -69,12 +106,13 @@ const ProductAppExtension = () => {
 
     if (Array.isArray(product.variants) && product.variants.length > 1) {
       product.variants.forEach(variant => {
+        if (bundleVariantIds.has(variant.id)) return;
         const variantSku = variant.sku || variant.option_values?.map(ov => ov.label).join('-');
         if (variantSku) {
           const variantName = variant.option_values?.map(ov => ov.label).join(' - ') || 'Variant';
           acc.push({
             value: `sku-${variantSku}`,
-            label: `${product.label} [${variantName}] [${variantSku}]`,
+            label: `${variantSku}: ${product.label} - ${variantName}`,
             productId: product.value,
             sku: variantSku,
             isMainProduct: false,
@@ -344,18 +382,8 @@ const ProductAppExtension = () => {
       const updatePromises = [];
 
       if (hasMultipleVariants) {
-        // Update each variant
+        // Update each variant (do not change variant SKUs per new rules)
         for (const variant of variants) {
-          const currentSku = variant.sku || '';
-          const hasBunPrefix = currentSku.startsWith('BUN-');
-          let newSku = currentSku;
-
-          if (isActuallyBundle && !hasBunPrefix) {
-            newSku = `BUN-${currentSku}`;
-          } else if (!isActuallyBundle && hasBunPrefix) {
-            newSku = currentSku.replace('BUN-', '');
-          }
-
           // Save metafields for each variant
           const variantMetafieldsData = {
             isBundle: isActuallyBundle,
@@ -381,63 +409,80 @@ const ProductAppExtension = () => {
             })
           );
 
-          if (newSku !== currentSku) {
-            updatePromises.push(
-              fetch(`/api/products/${productId}/variants/${variant.id}?context=${encodeURIComponent(context)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  sku: newSku,
-                  inventory_tracking: isActuallyBundle ? "variant" : "none"
-                }),
-              })
-            );
-          }
-
           if (isActuallyBundle && variantLinkedProducts[variant.id]) {
-            // Calculate variant stock based on linked products
-            const stockLevels = await Promise.all(
+            // Calculate variant stock and weight based on linked products
+            const components = await Promise.all(
               variantLinkedProducts[variant.id].map(async (p) => {
                 const res = await fetch(`/api/products/${p.value}?context=${encodeURIComponent(context)}`);
                 if (!res.ok) {
-                  console.warn(`Failed to fetch stock for product ${p.value}`);
+                  console.warn(`Failed to fetch product ${p.value}`);
 
-                  return 0;
+                  return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
                 }
                 const data = await res.json();
 
-                // If the product has variants and we have a variant ID, get the specific variant's stock
+                const key = p.variantId ? `${p.productId}-${p.variantId}` : p.value.toString();
+                const qty = variantProductQuantities[variant.id]?.[key] || 1;
+
                 if (data.variants && data.variants.length > 0 && p.variantId) {
                   const variantRes = await fetch(`/api/products/${p.value}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
                   if (!variantRes.ok) {
-                    console.warn(`Failed to fetch stock for variant ${p.variantId} of product ${p.value}`);
+                    console.warn(`Failed to fetch variant ${p.variantId} of product ${p.value}`);
 
-                    return 0;
+                    return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
                   }
                   const variantData = await variantRes.json();
-                  const key = `${p.productId}-${p.variantId}`;
 
-                  return Math.floor((variantData.inventory_level ?? 0) / (productQuantities[key] || 1));
+                  return {
+                    availableUnits: Math.floor((variantData.inventory_level ?? 0) / qty),
+                    weightContribution: (variantData.weight ?? 0) * qty,
+                    priceContribution: (variantData.price ?? 0) * qty,
+                  };
                 }
 
-                // For non-variant products or if we don't have a variant ID, use the product's stock
-                const key = p.variantId ? `${p.productId}-${p.variantId}` : p.value.toString();
-
-                return Math.floor((data.inventory_level ?? 0) / (productQuantities[key] || 1));
+                return {
+                  availableUnits: Math.floor((data.inventory_level ?? 0) / qty),
+                  weightContribution: (data.weight ?? 0) * qty,
+                  priceContribution: (data.price ?? 0) * qty,
+                };
               })
             );
 
-            const minStock = Math.min(...stockLevels);
+            const minStock = Math.min(...components.map(c => c.availableUnits));
+            const totalWeight = components.reduce((sum, c) => sum + c.weightContribution, 0);
+            const totalPrice = components.reduce((sum, c) => sum + c.priceContribution, 0);
             updatePromises.push(
               fetch(`/api/products/${productId}/variants/${variant.id}?context=${encodeURIComponent(context)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  inventory_level: minStock
+                  inventory_level: minStock,
+                  weight: totalWeight,
+                  price: totalPrice,
                 }),
               })
             );
           }
+        }
+        // Update main product SKU (add/remove BUN- prefix) when product has variants
+        const currentProductSku = product?.sku || '';
+        const hasBunPrefixOnProduct = currentProductSku.startsWith('BUN-');
+        let newProductSku = currentProductSku;
+
+        if (isActuallyBundle && !hasBunPrefixOnProduct) {
+          newProductSku = `BUN-${currentProductSku}`;
+        } else if (!isActuallyBundle && hasBunPrefixOnProduct) {
+          newProductSku = currentProductSku.replace('BUN-', '');
+        }
+
+        if (newProductSku !== currentProductSku) {
+          updatePromises.push(
+            fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sku: newProductSku }),
+            })
+          );
         }
       } else {
         // For products without variants, save at product level
@@ -466,60 +511,57 @@ const ProductAppExtension = () => {
           })
         );
 
-        // Update main product
-        const currentSku = product?.sku || '';
-        const hasBunPrefix = currentSku.startsWith('BUN-');
-        let newSku = currentSku;
-
-        if (isActuallyBundle && !hasBunPrefix) {
-          newSku = `BUN-${currentSku}`;
-        } else if (!isActuallyBundle && hasBunPrefix) {
-          newSku = currentSku.replace('BUN-', '');
-        }
-
         const updateData: any = {};
 
-        if (newSku !== currentSku) {
-          updateData.sku = newSku;
-        }
-
         if (isActuallyBundle) {
-          const stockLevels = await Promise.all(
+          const components = await Promise.all(
             linkedProducts.map(async (p) => {
               // Use productId for fetching the product, not the variant ID
-              const productId = p.productId || p.value;
-              const res = await fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`);
+              const compProductId = p.productId || p.value;
+              const res = await fetch(`/api/products/${compProductId}?context=${encodeURIComponent(context)}`);
               if (!res.ok) {
-                console.warn(`Failed to fetch stock for product ${productId}`);
+                console.warn(`Failed to fetch product ${compProductId}`);
 
-                return 0;
+                return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
               }
               const data = await res.json();
 
-              // If the product has variants and we have a variant ID, get the specific variant's stock
               if (data.variants && data.variants.length > 0 && p.variantId) {
-                const variantRes = await fetch(`/api/products/${productId}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
+                const variantRes = await fetch(`/api/products/${compProductId}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
                 if (!variantRes.ok) {
-                  console.warn(`Failed to fetch stock for variant ${p.variantId} of product ${productId}`);
+                  console.warn(`Failed to fetch variant ${p.variantId} of product ${compProductId}`);
 
-                  return 0;
+                  return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
                 }
                 const variantData = await variantRes.json();
-                const key = `${productId}-${p.variantId}`;
+                const key = `${compProductId}-${p.variantId}`;
+                const qty = productQuantities[key] || 1;
 
-                return Math.floor((variantData.inventory_level ?? 0) / (productQuantities[key] || 1));
+                return {
+                  availableUnits: Math.floor((variantData.inventory_level ?? 0) / qty),
+                  weightContribution: (variantData.weight ?? 0) * qty,
+                  priceContribution: (variantData.price ?? 0) * qty,
+                };
               }
 
-              // For non-variant products or if we don't have a variant ID, use the product's stock
-              const key = p.variantId ? `${productId}-${p.variantId}` : productId.toString();
+              const key = p.variantId ? `${compProductId}-${p.variantId}` : compProductId.toString();
+              const qty = productQuantities[key] || 1;
 
-              return Math.floor((data.inventory_level ?? 0) / (productQuantities[key] || 1));
+              return {
+                availableUnits: Math.floor((data.inventory_level ?? 0) / qty),
+                weightContribution: (data.weight ?? 0) * qty,
+                priceContribution: (data.price ?? 0) * qty,
+              };
             })
           );
 
-          const minStock = Math.min(...stockLevels);
+          const minStock = Math.min(...components.map(c => c.availableUnits));
+          const totalWeight = components.reduce((sum, c) => sum + c.weightContribution, 0);
+          const totalPrice = components.reduce((sum, c) => sum + c.priceContribution, 0);
           updateData.inventory_level = minStock;
           updateData.inventory_tracking = "product";
+          updateData.weight = totalWeight;
+          updateData.price = totalPrice;
           updateData.is_visible = true;
         } else {
           updateData.inventory_tracking = "none";
@@ -555,8 +597,8 @@ const ProductAppExtension = () => {
 
   return (
     <>
-      <BasicInfoPanel name={name} />
       <BundleSettingsPanel
+        header={name}
         isBundle={isBundle}
         onBundleToggle={() => setIsBundle(prev => !prev)}
         combinedOptions={combinedOptions}

@@ -6,11 +6,13 @@ import InnerHeader from './innerHeader';
 export const TabIds = {
     HOME: 'home',
     PRODUCTS: 'products',
+    DISCOUNTS: 'discounts',
 };
 
 export const TabRoutes = {
     [TabIds.HOME]: '/',
     [TabIds.PRODUCTS]: '/products',
+    [TabIds.DISCOUNTS]: '/discounts',
 };
 
 const HeaderlessRoutes = [
@@ -61,12 +63,13 @@ const Header = () => {
     const items = [
         { ariaControls: 'home', id: TabIds.HOME, title: 'Home' },
         { ariaControls: 'products', id: TabIds.PRODUCTS, title: 'Products' },
+        { ariaControls: 'discounts', id: TabIds.DISCOUNTS, title: 'Discounts' },
     ];
 
     const handleTabClick = (tabId: string) => {
         setActiveTab(tabId);
 
-        return router.push(TabRoutes[tabId]);
+        return router.push({ pathname: TabRoutes[tabId], query: router.query });
     };
 
     if (headerType === HeaderTypes.HEADERLESS) return null;

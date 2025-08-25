@@ -31,13 +31,36 @@ const ProductSelector = ({
   linkedProducts,
   products
 }: ProductSelectorProps) => {
-  const filteredOptions = combinedOptions.filter(option => {
-    const id = option.variantId
+  const isOptionLinked = (option: ProductOption) => {
+    const optionKey = option.variantId
       ? `${option.productId}-${option.variantId}`
       : `${option.productId}-`;
-    const isAlreadyLinked = linkedProducts.some(lp => lp.id === id);
 
-    return !isAlreadyLinked;
+    return linkedProducts.some(lp => {
+      const lpProductId = (lp as any).productId ?? (lp as any).value;
+      const lpVariantId = (lp as any).variantId ?? null;
+      const lpKey = lpVariantId ? `${lpProductId}-${lpVariantId}` : `${lpProductId}-`;
+
+      return lpKey === optionKey;
+    });
+  };
+
+  const hasInventoryTrackingEnabled = (option: ProductOption) => {
+    const product = products.find(p => p.value === option.productId);
+    const hasMultipleVariants = product?.variants && product?.variants.length > 1;
+
+    if (option.isMainProduct) {
+      return product?.inventory_tracking === "product";
+    }
+
+    return Boolean(hasMultipleVariants && product?.inventory_tracking === "variant");
+  };
+
+  const filteredOptions = combinedOptions.filter(option => {
+    if (isOptionLinked(option)) return false;
+    if (!hasInventoryTrackingEnabled(option)) return false;
+
+    return true;
   });
 
   return (
@@ -58,27 +81,7 @@ const ProductSelector = ({
         }}
         placeholder="Search and select a product or SKU..."
         noOptionsMessage={() => "No products available. Note: Products must have inventory tracking enabled to be added to bundles."}
-        formatOptionLabel={(option) => {
-          const product = products.find(p => p.value === option.productId);
-          const hasMultipleVariants = product?.variants && product?.variants.length > 1;
-          const hasInventoryTracking = option.isMainProduct 
-            ? product?.inventory_tracking === "product"
-            : hasMultipleVariants && product?.inventory_tracking === "variant";
-
-          return (
-            <div style={{ 
-              opacity: hasInventoryTracking ? 1 : 0.5,
-              color: hasInventoryTracking ? "inherit" : "#666"
-            }}>
-              {option.label}
-              {!hasInventoryTracking && (
-                <Small color="secondary" style={{ marginLeft: "8px" }}>
-                  (Inventory tracking disabled)
-                </Small>
-              )}
-            </div>
-          );
-        }}
+        formatOptionLabel={(option) => option.label}
       />
       <Small marginTop="small" color="secondary">
         Note: Only products with inventory tracking enabled can be added to bundles.
