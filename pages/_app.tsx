@@ -20,7 +20,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         <ThemeProvider theme={defaultTheme}>
             <GlobalStyles />
             {alerts.map((alert, index) => (
-                <Alert key={index} {...alert} />
+                <Alert key={index} {...alert} onClose={() => alertsManager.remove(alert)} />
             ))}
             <Box
                 marginHorizontal={{ mobile: 'none', tablet: 'xxxLarge' }}

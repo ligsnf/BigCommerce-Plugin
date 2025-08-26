@@ -78,7 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         namespace: NAMESPACE,
         key: KEY,
         value: JSON.stringify({ name, type, amount: parsedAmount, startDate, endDate, status }),
-        permission_set: 'app_only',
+        permission_set: 'read_and_write',
       };
 
       // Save/Update the metafield rule for each category (keeps UI listing intact)

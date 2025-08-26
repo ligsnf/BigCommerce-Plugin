@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Flex, FormGroup, H1, Input, Panel, MultiSelect, Table } from '@bigcommerce/big-design';
+import { Badge, Box, Button, Dropdown, Flex, FormGroup, H1, Input, Panel, MultiSelect, Table } from '@bigcommerce/big-design';
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../context/session';
 
@@ -78,6 +78,26 @@ export default function Discounts() {
     return `${start} - ${end}`.trim();
   };
 
+  const handleDeactivate = async (row: DiscountRow) => {
+    try {
+      const res = await fetch(`/api/categories/discounts/deactivate?context=${encodeURIComponent(context)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryIds: categoryOptions
+            .filter((opt) => row.categories.includes(opt.content))
+            .map((opt) => Number(opt.value)),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || 'Failed to deactivate');
+      await loadDiscounts();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error(e);
+    }
+  };
+
   const columns = [
     { header: 'Name', hash: 'name', render: ({ name }: DiscountRow) => name },
     { header: 'Category', hash: 'categories', render: ({ categories }: DiscountRow) => categories.join(', ') },
@@ -87,8 +107,14 @@ export default function Discounts() {
     { header: 'Status', hash: 'status', render: ({ status }: DiscountRow) => (
       <Badge label={status} variant={status === 'Active' ? 'success' : 'secondary'} />
     ) },
-    { header: '', hideHeader: true, hash: 'actions', render: () => (
-      <Button variant="subtle">...</Button>
+    { header: '', hideHeader: true, hash: 'actions', render: (row: DiscountRow) => (
+      <Dropdown
+        toggle={<Button variant="subtle">Options</Button>}
+        items={[
+          { content: 'Deactivate', onItemClick: () => handleDeactivate(row), color: 'danger' },
+        ]}
+        placement="bottom-start"
+      />
     )},
   ];
 

@@ -5,6 +5,7 @@ import BundleSettingsPanel from '@components/BundleSettingsPanel';
 import ErrorMessage from '@components/error';
 import Loading from '@components/loading';
 import { useProductInfo, useProductList } from '@lib/hooks';
+import { alertsManager } from '@lib/alerts';
 
 interface Variant {
   id: number;
@@ -140,7 +141,11 @@ const ProductAppExtension = () => {
       : hasMultipleVariants && product.inventory_tracking === "variant";
 
     if (!hasInventoryTracking) {
-      alert("This product/variant cannot be added to bundles because it has inventory tracking disabled.");
+      alertsManager.add({
+        messages: [{ text: 'This product/variant cannot be added because inventory tracking is disabled.' }],
+        type: 'error',
+        onClose: () => null,
+      });
       setSelectedItem(null);
 
       return;
@@ -374,7 +379,7 @@ const ProductAppExtension = () => {
       const hasMultipleVariants = variants.length > 1;
       const isActuallyBundle = isBundle && (
         hasMultipleVariants
-          ? Object.values(variantLinkedProducts).every(products => products.length > 0)
+          ? Object.values(variantLinkedProducts).some(products => (products as any[]).length > 0)
           : linkedProducts.length > 0
       );
 
@@ -382,12 +387,17 @@ const ProductAppExtension = () => {
       const updatePromises = [];
 
       if (hasMultipleVariants) {
+        let anyVariantIsBundle = false;
         // Update each variant (do not change variant SKUs per new rules)
         for (const variant of variants) {
           // Save metafields for each variant
+          const currentVariantProducts = variantLinkedProducts[variant.id] || [];
+          const variantHasBundle = isBundle && currentVariantProducts.length > 0;
+          if (variantHasBundle) anyVariantIsBundle = true;
+
           const variantMetafieldsData = {
-            isBundle: isActuallyBundle,
-            linkedProductIds: isActuallyBundle ? (variantLinkedProducts[variant.id] || []).map((p) => {
+            isBundle: variantHasBundle,
+            linkedProductIds: variantHasBundle ? currentVariantProducts.map((p) => {
               const productId = p.productId || p.value;
               const key = p.variantId ? `${productId}-${p.variantId}` : productId.toString();
 
@@ -409,10 +419,10 @@ const ProductAppExtension = () => {
             })
           );
 
-          if (isActuallyBundle && variantLinkedProducts[variant.id]) {
+          if (variantHasBundle) {
             // Calculate variant stock and weight based on linked products
             const components = await Promise.all(
-              variantLinkedProducts[variant.id].map(async (p) => {
+              currentVariantProducts.map(async (p) => {
                 const res = await fetch(`/api/products/${p.value}?context=${encodeURIComponent(context)}`);
                 if (!res.ok) {
                   console.warn(`Failed to fetch product ${p.value}`);
@@ -469,9 +479,9 @@ const ProductAppExtension = () => {
         const hasBunPrefixOnProduct = currentProductSku.startsWith('BUN-');
         let newProductSku = currentProductSku;
 
-        if (isActuallyBundle && !hasBunPrefixOnProduct) {
+        if (anyVariantIsBundle && !hasBunPrefixOnProduct) {
           newProductSku = `BUN-${currentProductSku}`;
-        } else if (!isActuallyBundle && hasBunPrefixOnProduct) {
+        } else if (!anyVariantIsBundle && hasBunPrefixOnProduct) {
           newProductSku = currentProductSku.replace('BUN-', '');
         }
 
@@ -580,13 +590,30 @@ const ProductAppExtension = () => {
       await Promise.all(updatePromises);
 
       if (isActuallyBundle) {
-        alert(`Product has been saved as a bundle${hasMultipleVariants ? ' with variant-level bundling' : ''}.`);
+        alertsManager.add({
+          messages: [{ text: `Product saved as a bundle${hasMultipleVariants ? ' (variant-level)' : ''}.` }],
+          type: 'success',
+          onClose: () => null,
+        });
       } else {
-        alert('Product has been saved as a regular product (not a bundle).');
+        alertsManager.add({
+          messages: [{ text: 'Product saved as a regular product (not a bundle).' }],
+          type: 'success',
+          onClose: () => null,
+        });
       }
+
+      // Refresh the page to reflect latest state (preserve query params)
+      setTimeout(() => {
+        router.replace({ pathname: router.pathname, query: router.query });
+      }, 300);
     } catch (err) {
       console.error('Save error:', err);
-      alert('Failed to save changes.');
+      alertsManager.add({
+        messages: [{ text: 'Failed to save changes.' }],
+        type: 'error',
+        onClose: () => null,
+      });
     } finally {
       setSaving(false);
     }
