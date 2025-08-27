@@ -24,10 +24,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const { data } = await response.json();
 
-      // Restrict to the shared namespace
-      const bundleFields = (data || []).filter((f: any) => f.namespace === 'bundle');
-      const isBundle = bundleFields.find((f: any) => f.key === 'is_bundle')?.value === 'true';
-      const linkedIdsRaw = bundleFields.find((f: any) => f.key === 'linked_product_ids')?.value;
+      const isBundle = data.find(f => f.key === 'is_bundle')?.value === 'true';
+      const linkedIdsRaw = data.find(f => f.key === 'linked_product_ids')?.value;
       let linkedProductIds = linkedIdsRaw ? JSON.parse(linkedIdsRaw) : [];
       // Normalize: always return array of { productId, variantId, quantity }
       linkedProductIds = linkedProductIds.map(item => {
@@ -75,9 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { data: existingFields } = await existingRes.json();
 
       const existingByKey = Object.fromEntries(
-        (existingFields || [])
-          .filter((f: any) => f.namespace === 'bundle')
-          .map((field: any) => [field.key, field])
+        existingFields.map((field: any) => [field.key, field])
       );
 
       // Ensure all entries are objects with productId, variantId, quantity
@@ -102,14 +98,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           key: 'is_bundle',
           value: isBundle.toString(),
           namespace: 'bundle',
-          permission_set: 'read_and_write',
+          permission_set: 'app_only',
           description: 'Whether this variant is a bundle',
         },
         {
-          key: 'linked_product_ids',
+          key: 'linked_product_ids' ,
           value: JSON.stringify(normalizedLinkedProductIds),
           namespace: 'bundle',
-          permission_set: 'read_and_write',
+          permission_set: 'app_only',
           description: 'Array of product/variant objects in the variant bundle',
         }
       ];
