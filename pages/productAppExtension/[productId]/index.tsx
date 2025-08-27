@@ -433,6 +433,7 @@ const ProductAppExtension = () => {
       if (hasMultipleVariants) {
         let anyVariantIsBundle = false;
         let firstBundleVariantPrice: number | null = null;
+        let firstBundleVariantWeight: number | null = null;
         // Update each variant (do not change variant SKUs per new rules)
         for (const variant of variants) {
           // Save metafields for each variant
@@ -514,6 +515,9 @@ const ProductAppExtension = () => {
             if (firstBundleVariantPrice == null) {
               firstBundleVariantPrice = finalPrice;
             }
+            if (firstBundleVariantWeight == null) {
+              firstBundleVariantWeight = totalWeight;
+            }
             updatePromises.push(
               fetch(`/api/products/${productId}/variants/${variant.id}?context=${encodeURIComponent(context)}`, {
                 method: 'PUT',
@@ -548,13 +552,16 @@ const ProductAppExtension = () => {
           );
         }
 
-        // Set parent product price to the first bundle variant's price
-        if (firstBundleVariantPrice != null) {
+        // Set parent product price/weight to the first bundle variant's values
+        if (firstBundleVariantPrice != null || firstBundleVariantWeight != null) {
+          const parentUpdate: any = {};
+          if (firstBundleVariantPrice != null) parentUpdate.price = firstBundleVariantPrice;
+          if (firstBundleVariantWeight != null) parentUpdate.weight = firstBundleVariantWeight;
           updatePromises.push(
             fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ price: firstBundleVariantPrice }),
+              body: JSON.stringify(parentUpdate),
             })
           );
         }
