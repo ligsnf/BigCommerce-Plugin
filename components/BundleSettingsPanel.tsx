@@ -1,4 +1,4 @@
-import { Box, Button, H4, Input, Panel, Switch } from '@bigcommerce/big-design';
+import { Box, Button, H4, Input, Panel, Small, Switch } from '@bigcommerce/big-design';
 import BundleItemsTable from './BundleItemsTable';
 import ProductSelector from './ProductSelector';
 
@@ -174,7 +174,14 @@ const BundleSettingsPanel = ({
         </Box>
       )}
 
+      {isBundle && hasMultipleVariants && !canSave && (
+        <Box marginBottom="xxSmall">
+          <Small color="danger">All variants must have products in order to save.</Small>
+        </Box>
+      )}
+
       <Button
+        actionType={wasBundleOnLoad && !isBundle ? 'destructive' : 'normal'}
         isLoading={saving}
         disabled={saving || !canSave}
         onClick={onSave}
