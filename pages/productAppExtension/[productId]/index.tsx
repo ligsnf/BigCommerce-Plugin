@@ -731,7 +731,20 @@ const ProductAppExtension = () => {
       // Full refresh shortly after showing the success message
       setTimeout(() => {
         if (typeof window !== 'undefined') {
-          window.location.reload();
+          try {
+            // If embedded in an iframe (e.g., BigCommerce panel), try to reload the top-level page
+            if (window.top && window.top !== window) {
+              // Using href assignment avoids some cross-origin reload issues
+              window.top.location.href = window.top.location.href;
+
+              return;
+            }
+          } catch (e) {
+            // Ignore cross-origin access errors and fall back to reloading this window
+          }
+
+          // Fallback: reload current window
+          window.location.href = window.location.href;
         }
       }, 1200);
     } catch (err) {
