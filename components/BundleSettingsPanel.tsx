@@ -27,6 +27,7 @@ interface BundleSettingsPanelProps {
   onOverridePriceChange: (value: number | null) => void;
   variantOverridePrices: Record<number, number | null>;
   onVariantOverridePriceChange: (variantId: number, value: number | null) => void;
+  wasBundleOnLoad: boolean;
 }
 
 const BundleSettingsPanel = ({
@@ -54,7 +55,8 @@ const BundleSettingsPanel = ({
   overridePrice,
   onOverridePriceChange,
   variantOverridePrices,
-  onVariantOverridePriceChange
+  onVariantOverridePriceChange,
+  wasBundleOnLoad
 }: BundleSettingsPanelProps) => {
   const hasMultipleVariants = variants && variants.length > 1;
   const canSave = !isBundle || (
@@ -178,7 +180,7 @@ const BundleSettingsPanel = ({
         onClick={onSave}
         marginTop="medium"
       >
-        Save
+        {wasBundleOnLoad && !isBundle ? 'Remove bundle status' : 'Save'}
       </Button>
     </Panel>
   );

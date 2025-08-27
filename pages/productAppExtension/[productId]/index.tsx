@@ -40,6 +40,8 @@ const ProductAppExtension = () => {
   const [bundleVariantIds, setBundleVariantIds] = useState<Set<number>>(new Set());
   const [overridePrice, setOverridePrice] = useState<number | null>(null);
   const [variantOverridePrices, setVariantOverridePrices] = useState<Record<number, number | null>>({});
+  const [metafieldsLoading, setMetafieldsLoading] = useState<boolean>(true);
+  const [wasBundleOnLoad, setWasBundleOnLoad] = useState<boolean>(false);
 
   // Fetch bundles (by metafields) to exclude them from selection
   useEffect(() => {
@@ -190,9 +192,14 @@ const ProductAppExtension = () => {
   // Load existing metafields on load
   useEffect(() => {
     async function fetchMetafields() {
-      if (!productId || products.length === 0) return;
+      if (!productId || products.length === 0) {
+        setMetafieldsLoading(false);
+
+        return;
+      }
 
       try {
+        setMetafieldsLoading(true);
         const hasMultipleVariants = variants.length > 1;
         console.log('Initial load - Product data:', {
           productId,
@@ -216,6 +223,13 @@ const ProductAppExtension = () => {
 
           const variantMetafieldsResults = await Promise.all(variantMetafieldsPromises);
           console.log('Variant metafields results:', variantMetafieldsResults);
+          console.log('Variant-level bundle linked_product_ids (raw) by variant:',
+            variants.map((v, i) => ({
+              variantId: v.id,
+              isBundle: Boolean(variantMetafieldsResults[i]?.isBundle),
+              linkedProductIds: variantMetafieldsResults[i]?.linkedProductIds ?? null,
+            }))
+          );
 
           // Process variant metafields
           const variantData = {};
@@ -284,47 +298,59 @@ const ProductAppExtension = () => {
           setVariantOverridePrices(variantOverrides);
 
           // Set isBundle based on whether any variant is a bundle
-          setIsBundle(Object.values(variantData).some(isBundle => isBundle));
+          const anyVariantBundle = Object.values(variantData).some(isBundle => isBundle);
+          setIsBundle(anyVariantBundle);
+          setWasBundleOnLoad(anyVariantBundle);
         } else {
           // For products without variants, fetch product metafields
           const res = await fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`);
           const data = await res.json();
           console.log('Product metafields data:', data);
+          console.log('Product-level bundle linked_product_ids (raw):', data?.linkedProductIds ?? null);
 
           if (res.ok) {
             setIsBundle(data.isBundle);
+            setWasBundleOnLoad(Boolean(data.isBundle));
             setOverridePrice(data.overridePrice ?? null);
 
-            // Map products with their quantities
+            // Map products with their quantities (distinguish productId vs variantId reliably)
             const mappedProducts = data.linkedProductIds.map((linkedProduct) => {
-              // Handle both old format (just ID) and new format (object with productId and variantId)
-              const id = typeof linkedProduct === 'object' ? linkedProduct.variantId || linkedProduct.productId : linkedProduct;
-              const quantity = typeof linkedProduct === 'object' ? linkedProduct.quantity : 1;
+              if (typeof linkedProduct === 'object' && linkedProduct !== null) {
+                const pid = linkedProduct.productId;
+                const vid = linkedProduct.variantId ?? null;
+                const qty = linkedProduct.quantity ?? 1;
 
-              // First try to find a product with this variant ID
-              const productWithVariant = products.find(p =>
-                p.variants && p.variants.some(v => v.id === id)
-              );
+                if (vid) {
+                  // Variant-linked item
+                  const productWithVariant = products.find(p => p.variants && p.variants.some(v => v.id === vid));
+                  if (productWithVariant) {
+                    const variant = productWithVariant.variants.find(v => v.id === vid);
+                    return {
+                      value: vid,
+                      label: `${productWithVariant.label} [${variant.option_values.map(ov => ov.label).join(' - ')}]`,
+                      sku: variant.sku,
+                      skuLabel: variant.sku,
+                      productId: productWithVariant.value,
+                      variantId: vid,
+                      quantity: qty
+                    };
+                  }
 
-              if (productWithVariant) {
-                const variant = productWithVariant.variants.find(v => v.id === id);
+                  // Could not resolve variant; fall back to product id labeling
+                  return { value: pid, label: `Product ${pid}`, productId: pid, variantId: vid, quantity: qty, skuLabel: '' };
+                }
 
-                return {
-                  value: id,
-                  label: `${productWithVariant.label} [${variant.option_values.map(ov => ov.label).join(' - ')}]`,
-                  sku: variant.sku,
-                  skuLabel: variant.sku,
-                  productId: productWithVariant.value,
-                  variantId: id,
-                  quantity: quantity
-                };
+                // Product-linked item (no variantId)
+                const match = products.find(p => p.value === pid);
+                const product = match ?? { value: pid, label: `Product ${pid}`, sku: '' };
+                return { ...product, value: pid, variantId: null, quantity: qty, skuLabel: (product as any).sku };
               }
 
-              // Fallback to finding by product ID
-              const match = products.find(p => p.value === id);
-              const product = match ?? { value: id, label: `Product ${id}` };
-
-              return { ...product, quantity, skuLabel: (product as any).sku };
+              // Old format: just a productId number
+              const pid = linkedProduct as number;
+              const match = products.find(p => p.value === pid);
+              const product = match ?? { value: pid, label: `Product ${pid}`, sku: '' };
+              return { ...product, value: pid, variantId: null, quantity: 1, skuLabel: (product as any).sku };
             });
 
             // Set quantities from the mapped products
@@ -344,6 +370,8 @@ const ProductAppExtension = () => {
         }
       } catch (err) {
         console.error('Error fetching metafields:', err);
+      } finally {
+        setMetafieldsLoading(false);
       }
     }
 
@@ -429,7 +457,7 @@ const ProductAppExtension = () => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 ...variantMetafieldsData,
-                overridePrice: variantOverridePrices[variant.id] ?? null,
+                overridePrice: variantHasBundle ? (variantOverridePrices[variant.id] ?? null) : null,
               }),
             })
           );
@@ -511,6 +539,39 @@ const ProductAppExtension = () => {
             })
           );
         }
+
+        // Ensure product has/doesn't have the 'Bundle' category based on variant bundles
+        try {
+          const shouldHaveBundleCategory = anyVariantIsBundle;
+          const ensureRes = await fetch(`/api/categories/ensure-bundle?context=${encodeURIComponent(context)}`);
+          if (ensureRes.ok) {
+            const { id: bundleCategoryId } = await ensureRes.json();
+            const prodRes = await fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`);
+            if (prodRes.ok) {
+              const prodData = await prodRes.json();
+              const currentCats: number[] = Array.isArray(prodData.categories) ? prodData.categories : [];
+              const hasBundle = currentCats.includes(bundleCategoryId);
+              let nextCats = currentCats;
+              if (shouldHaveBundleCategory && !hasBundle) {
+                nextCats = [...currentCats, bundleCategoryId];
+              } else if (!shouldHaveBundleCategory && hasBundle) {
+                nextCats = currentCats.filter((c) => c !== bundleCategoryId);
+              }
+              if (nextCats !== currentCats) {
+                updatePromises.push(
+                  fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ categories: nextCats }),
+                  })
+                );
+              }
+            }
+          }
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn('Failed to ensure/update Bundle category for product with variants:', e);
+        }
       } else {
         // For products without variants, save at product level
         const metafieldsData = {
@@ -528,7 +589,7 @@ const ProductAppExtension = () => {
           })
         } as any;
 
-        metafieldsData.overridePrice = overridePrice ?? null;
+        metafieldsData.overridePrice = isActuallyBundle ? (overridePrice ?? null) : null;
 
         console.log('Saving metafields for main product:', JSON.stringify(metafieldsData, null, 2));
 
@@ -566,10 +627,14 @@ const ProductAppExtension = () => {
                 const key = `${compProductId}-${p.variantId}`;
                 const qty = productQuantities[key] || 1;
 
+                // Use variant's weight/price, but fall back to product's if variant fields are null/undefined
+                const unitWeight = (variantData.weight != null ? variantData.weight : (data.weight ?? 0));
+                const unitPrice = (variantData.price != null ? variantData.price : (data.price ?? 0));
+
                 return {
                   availableUnits: Math.floor((variantData.inventory_level ?? 0) / qty),
-                  weightContribution: (variantData.weight ?? 0) * qty,
-                  priceContribution: (variantData.price ?? 0) * qty,
+                  weightContribution: unitWeight * qty,
+                  priceContribution: unitPrice * qty,
                 };
               }
 
@@ -593,9 +658,45 @@ const ProductAppExtension = () => {
           updateData.weight = totalWeight;
           updateData.price = finalPrice;
           updateData.is_visible = true;
+          // Ensure product has the 'Bundle' category
+          try {
+            const ensureRes = await fetch(`/api/categories/ensure-bundle?context=${encodeURIComponent(context)}`);
+            if (ensureRes.ok) {
+              const { id: bundleCategoryId } = await ensureRes.json();
+              const prodRes = await fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`);
+              if (prodRes.ok) {
+                const prodData = await prodRes.json();
+                const currentCats: number[] = Array.isArray(prodData.categories) ? prodData.categories : [];
+                if (!currentCats.includes(bundleCategoryId)) {
+                  updateData.categories = [...currentCats, bundleCategoryId];
+                }
+              }
+            }
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn('Failed to ensure/add Bundle category for product:', e);
+          }
         } else {
           updateData.inventory_tracking = "none";
           updateData.inventory_level = null;
+          // Remove 'Bundle' category if present when not a bundle
+          try {
+            const ensureRes = await fetch(`/api/categories/ensure-bundle?context=${encodeURIComponent(context)}`);
+            if (ensureRes.ok) {
+              const { id: bundleCategoryId } = await ensureRes.json();
+              const prodRes = await fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`);
+              if (prodRes.ok) {
+                const prodData = await prodRes.json();
+                const currentCats: number[] = Array.isArray(prodData.categories) ? prodData.categories : [];
+                if (currentCats.includes(bundleCategoryId)) {
+                  updateData.categories = currentCats.filter((c) => c !== bundleCategoryId);
+                }
+              }
+            }
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn('Failed to remove Bundle category for non-bundle product:', e);
+          }
         }
 
         updatePromises.push(
@@ -623,10 +724,12 @@ const ProductAppExtension = () => {
         });
       }
 
-      // Refresh the page to reflect latest state (preserve query params)
+      // Full refresh shortly after showing the success message
       setTimeout(() => {
-        router.replace({ pathname: router.pathname, query: router.query });
-      }, 300);
+        if (typeof window !== 'undefined') {
+          window.location.reload();
+        }
+      }, 1200);
     } catch (err) {
       console.error('Save error:', err);
       alertsManager.add({
@@ -639,7 +742,7 @@ const ProductAppExtension = () => {
     }
   };
 
-  if (isLoading || isProductsLoading) return <Loading />;
+  if (isLoading || isProductsLoading || metafieldsLoading) return <Loading />;
   if (error || productsError) return <ErrorMessage error={error || productsError} />;
 
   return (
@@ -669,6 +772,7 @@ const ProductAppExtension = () => {
         onOverridePriceChange={setOverridePrice}
         variantOverridePrices={variantOverridePrices}
         onVariantOverridePriceChange={handleVariantOverridePriceChange}
+        wasBundleOnLoad={wasBundleOnLoad}
       />
     </>
   );
