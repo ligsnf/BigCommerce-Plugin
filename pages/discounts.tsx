@@ -32,8 +32,6 @@ export default function Discounts() {
       setDiscounts((json?.data || []) as DiscountRow[]);
     } catch (err: any) {
       setDiscountsError(err?.message || 'Unable to fetch discounts');
-    } finally {
-      
     }
   };
 
@@ -75,7 +73,7 @@ export default function Discounts() {
   const formatValidity = (row: DiscountRow) => {
     const start = row.startDate ? new Date(row.startDate).toLocaleDateString() : '';
     const end = row.endDate ? new Date(row.endDate).toLocaleDateString() : 'Ongoing';
-    
+
     return `${start} - ${end}`.trim();
   };
 

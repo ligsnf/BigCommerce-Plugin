@@ -2,27 +2,6 @@
 import { Box, Button, H1, Panel, Text } from '@bigcommerce/big-design';
 import { useRouter } from 'next/router';
 
-interface Product {
-  id: number;
-  name: string;
-  sku: string;
-  variants: Array<{
-    id: number;
-    sku: string;
-    option_values: Array<{ label: string }>;
-  }>;
-}
-
-interface Bundle {
-  id: number;
-  name: string;
-  sku: string;
-  isVariant: boolean;
-  variantId?: number;
-  variantName?: string;
-  productCount: number;
-}
-
 export default function Home() {
   const router = useRouter();
 

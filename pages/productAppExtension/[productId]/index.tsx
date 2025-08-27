@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import BundleSettingsPanel from '@components/BundleSettingsPanel';
 import ErrorMessage from '@components/error';
 import Loading from '@components/loading';
-import { useProductInfo, useProductList } from '@lib/hooks';
 import { alertsManager } from '@lib/alerts';
+import { useProductInfo, useProductList } from '@lib/hooks';
 
 interface Variant {
   id: number;

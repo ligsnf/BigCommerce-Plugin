@@ -7,6 +7,7 @@ const KEY = 'rule';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
+
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
@@ -16,6 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { categoryIds = [] } = req.body || {};
     if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
+
       return res.status(400).json({ message: 'categoryIds is required' });
     }
 
@@ -88,6 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error: any) {
     const status = error?.response?.status || 500;
     const message = error?.message || 'Internal server error';
+    
     return res.status(status).json({ message });
   }
 }
