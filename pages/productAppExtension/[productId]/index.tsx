@@ -38,6 +38,8 @@ const ProductAppExtension = () => {
   const [variantProductQuantities, setVariantProductQuantities] = useState<Record<number, Record<number, number>>>({});
   const [bundleProductIds, setBundleProductIds] = useState<Set<number>>(new Set());
   const [bundleVariantIds, setBundleVariantIds] = useState<Set<number>>(new Set());
+  const [overridePrice, setOverridePrice] = useState<number | null>(null);
+  const [variantOverridePrices, setVariantOverridePrices] = useState<Record<number, number | null>>({});
 
   // Fetch bundles (by metafields) to exclude them from selection
   useEffect(() => {
@@ -219,11 +221,13 @@ const ProductAppExtension = () => {
           const variantData = {};
           const variantQuantities = {};
           const variantProducts = {};
+          const variantOverrides: Record<number, number | null> = {};
 
           variantMetafieldsResults.forEach((data, index) => {
             if (data) {
               const variantId = variants[index].id;
               variantData[variantId] = data.isBundle;
+              variantOverrides[variantId] = data.overridePrice ?? null;
 
               // Map linked products with their quantities
               variantProducts[variantId] = data.linkedProductIds.map((linkedProduct) => {
@@ -275,6 +279,7 @@ const ProductAppExtension = () => {
 
           setVariantLinkedProducts(variantProducts);
           setVariantProductQuantities(variantQuantities);
+          setVariantOverridePrices(variantOverrides);
 
           // Set isBundle based on whether any variant is a bundle
           setIsBundle(Object.values(variantData).some(isBundle => isBundle));
@@ -286,6 +291,7 @@ const ProductAppExtension = () => {
 
           if (res.ok) {
             setIsBundle(data.isBundle);
+            setOverridePrice(data.overridePrice ?? null);
 
             // Map products with their quantities
             const mappedProducts = data.linkedProductIds.map((linkedProduct) => {
@@ -372,6 +378,10 @@ const ProductAppExtension = () => {
     }));
   };
 
+  const handleVariantOverridePriceChange = (variantId: number, value: number | null) => {
+    setVariantOverridePrices(prev => ({ ...prev, [variantId]: value }));
+  };
+
   // Submit metafield data
   const handleSave = async () => {
     setSaving(true);
@@ -415,7 +425,10 @@ const ProductAppExtension = () => {
             fetch(`/api/productAppExtension/${productId}/variants/${variant.id}/metafields?context=${encodeURIComponent(context)}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(variantMetafieldsData),
+              body: JSON.stringify({
+                ...variantMetafieldsData,
+                overridePrice: variantOverridePrices[variant.id] ?? null,
+              }),
             })
           );
 
@@ -423,9 +436,10 @@ const ProductAppExtension = () => {
             // Calculate variant stock and weight based on linked products
             const components = await Promise.all(
               currentVariantProducts.map(async (p) => {
-                const res = await fetch(`/api/products/${p.value}?context=${encodeURIComponent(context)}`);
+                const compProductId = p.productId || p.value;
+                const res = await fetch(`/api/products/${compProductId}?context=${encodeURIComponent(context)}`);
                 if (!res.ok) {
-                  console.warn(`Failed to fetch product ${p.value}`);
+                  console.warn(`Failed to fetch product ${compProductId}`);
 
                   return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
                 }
@@ -435,9 +449,9 @@ const ProductAppExtension = () => {
                 const qty = variantProductQuantities[variant.id]?.[key] || 1;
 
                 if (data.variants && data.variants.length > 0 && p.variantId) {
-                  const variantRes = await fetch(`/api/products/${p.value}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
+                  const variantRes = await fetch(`/api/products/${compProductId}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
                   if (!variantRes.ok) {
-                    console.warn(`Failed to fetch variant ${p.variantId} of product ${p.value}`);
+                    console.warn(`Failed to fetch variant ${p.variantId} of product ${compProductId}`);
 
                     return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
                   }
@@ -460,7 +474,8 @@ const ProductAppExtension = () => {
 
             const minStock = Math.min(...components.map(c => c.availableUnits));
             const totalWeight = components.reduce((sum, c) => sum + c.weightContribution, 0);
-            const totalPrice = components.reduce((sum, c) => sum + c.priceContribution, 0);
+            const calculatedPrice = components.reduce((sum, c) => sum + c.priceContribution, 0);
+            const finalPrice = variantOverridePrices[variant.id] != null ? variantOverridePrices[variant.id] : calculatedPrice;
             updatePromises.push(
               fetch(`/api/products/${productId}/variants/${variant.id}?context=${encodeURIComponent(context)}`, {
                 method: 'PUT',
@@ -468,7 +483,7 @@ const ProductAppExtension = () => {
                 body: JSON.stringify({
                   inventory_level: minStock,
                   weight: totalWeight,
-                  price: totalPrice,
+                  price: finalPrice,
                 }),
               })
             );
@@ -509,7 +524,9 @@ const ProductAppExtension = () => {
               quantity: productQuantities[key] || 1
             };
           })
-        };
+        } as any;
+
+        metafieldsData.overridePrice = overridePrice ?? null;
 
         console.log('Saving metafields for main product:', JSON.stringify(metafieldsData, null, 2));
 
@@ -567,11 +584,12 @@ const ProductAppExtension = () => {
 
           const minStock = Math.min(...components.map(c => c.availableUnits));
           const totalWeight = components.reduce((sum, c) => sum + c.weightContribution, 0);
-          const totalPrice = components.reduce((sum, c) => sum + c.priceContribution, 0);
+          const calculatedPrice = components.reduce((sum, c) => sum + c.priceContribution, 0);
+          const finalPrice = overridePrice != null ? overridePrice : calculatedPrice;
           updateData.inventory_level = minStock;
           updateData.inventory_tracking = "product";
           updateData.weight = totalWeight;
-          updateData.price = totalPrice;
+          updateData.price = finalPrice;
           updateData.is_visible = true;
         } else {
           updateData.inventory_tracking = "none";
@@ -645,6 +663,10 @@ const ProductAppExtension = () => {
         variantProductQuantities={variantProductQuantities}
         onVariantQuantityChange={handleVariantQuantityChange}
         onVariantRemoveProduct={handleVariantRemoveProduct}
+        overridePrice={overridePrice}
+        onOverridePriceChange={setOverridePrice}
+        variantOverridePrices={variantOverridePrices}
+        onVariantOverridePriceChange={handleVariantOverridePriceChange}
       />
     </>
   );

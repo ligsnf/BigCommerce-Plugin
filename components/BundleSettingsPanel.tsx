@@ -1,4 +1,4 @@
-import { Box, Button, H4, Panel, Switch } from '@bigcommerce/big-design';
+import { Box, Button, H4, Input, Panel, Switch } from '@bigcommerce/big-design';
 import BundleItemsTable from './BundleItemsTable';
 import ProductSelector from './ProductSelector';
 
@@ -23,6 +23,10 @@ interface BundleSettingsPanelProps {
   variantProductQuantities: Record<number, Record<number, number>>;
   onVariantQuantityChange: (variantId: number, productId: number, quantity: number) => void;
   onVariantRemoveProduct: (variantId: number, productId: number) => void;
+  overridePrice: number | null;
+  onOverridePriceChange: (value: number | null) => void;
+  variantOverridePrices: Record<number, number | null>;
+  onVariantOverridePriceChange: (variantId: number, value: number | null) => void;
 }
 
 const BundleSettingsPanel = ({
@@ -46,6 +50,11 @@ const BundleSettingsPanel = ({
   variantProductQuantities,
   onVariantQuantityChange,
   onVariantRemoveProduct
+  ,
+  overridePrice,
+  onOverridePriceChange,
+  variantOverridePrices,
+  onVariantOverridePriceChange
 }: BundleSettingsPanelProps) => {
   const hasMultipleVariants = variants && variants.length > 1;
   const canSave = !isBundle || (
@@ -110,6 +119,20 @@ const BundleSettingsPanel = ({
                     onQuantityChange={(productId, quantity) => onVariantQuantityChange(selectedVariant.id, productId, quantity)}
                     onRemoveProduct={(productId) => onVariantRemoveProduct(selectedVariant.id, productId)}
                   />
+
+                  <Box marginTop="medium">
+                    <Input
+                      label="Override Price"
+                      type="number"
+                      iconLeft="$"
+                      value={variantOverridePrices[selectedVariant.id] ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const parsed = val === '' ? null : Number(val);
+                        onVariantOverridePriceChange(selectedVariant.id, isNaN(parsed as number) ? null : parsed);
+                      }}
+                    />
+                  </Box>
                 </>
               )}
             </>
@@ -130,6 +153,20 @@ const BundleSettingsPanel = ({
             onQuantityChange={onQuantityChange}
             onRemoveProduct={onRemoveProduct}
           />
+
+          <Box marginTop="medium">
+            <Input
+              label="Override Price"
+              type="number"
+              iconLeft="$"
+              value={overridePrice ?? ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                const parsed = val === '' ? null : Number(val);
+                onOverridePriceChange(isNaN(parsed as number) ? null : parsed);
+              }}
+            />
+          </Box>
             </>
           )}
         </Box>

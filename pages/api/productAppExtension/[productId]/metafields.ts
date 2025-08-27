@@ -26,6 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const isBundle = data.find(f => f.key === 'is_bundle')?.value === 'true';
       const linkedIdsRaw = data.find(f => f.key === 'linked_product_ids')?.value;
+      const overridePriceRaw = data.find(f => f.key === 'override_price')?.value;
       let linkedProductIds = linkedIdsRaw ? JSON.parse(linkedIdsRaw) : [];
       // Normalize: always return array of { productId, variantId, quantity }
       linkedProductIds = linkedProductIds.map(item => {
@@ -43,8 +44,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           };
         }
       });
+      const overridePrice = overridePriceRaw != null ? parseFloat(overridePriceRaw) : null;
 
-      return res.status(200).json({ isBundle, linkedProductIds });
+      return res.status(200).json({ isBundle, linkedProductIds, overridePrice });
     } catch (err: any) {
       console.error('[GET metafields] Error:', err);
 
@@ -55,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // POST: Save or update metafields
   if (req.method === 'POST') {
     try {
-      const { isBundle, linkedProductIds } = req.body;
+      const { isBundle, linkedProductIds, overridePrice } = req.body;
 
       if (typeof isBundle !== 'boolean') {
         return res.status(400).json({ message: 'Missing or invalid isBundle' });
@@ -107,7 +109,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           namespace: 'bundle',
           permission_set: 'app_only',
           description: 'Array of product/variant objects in the bundle',
-        }
+        },
+        // Optional override price metafield
+        ...(overridePrice != null && overridePrice !== '' ? [{
+          key: 'override_price',
+          value: String(overridePrice),
+          namespace: 'bundle',
+          permission_set: 'app_only',
+          description: 'Optional manual price override for the bundle',
+        }] : [])
       ];
 
       const responses = await Promise.all(
@@ -133,6 +143,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return result;
         })
       );
+
+      // If overridePrice is not provided, delete existing override_price metafield if present
+      if ((overridePrice == null || overridePrice === '') && existingByKey['override_price']) {
+        try {
+          await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/metafields/${existingByKey['override_price'].id}`, {
+            method: 'DELETE',
+            headers: {
+              'X-Auth-Token': accessToken,
+              Accept: 'application/json',
+            },
+          });
+        } catch (e) {
+          console.warn('[DELETE override_price metafield] Warning:', e);
+        }
+      }
 
       return res.status(200).json({ message: 'Metafields saved/updated', responses });
     } catch (err: any) {
