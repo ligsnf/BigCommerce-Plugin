@@ -14,7 +14,10 @@ const BundleItemsTable = ({
   onQuantityChange,
   onRemoveProduct
 }: BundleItemsTableProps) => {
-  if (linkedProducts.length === 0) return null;
+  if (linkedProducts.length === 0) {
+
+    return null;
+  }
 
   return (
     <Box marginTop="medium">

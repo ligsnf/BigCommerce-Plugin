@@ -742,8 +742,14 @@ const ProductAppExtension = () => {
     }
   };
 
-  if (isLoading || isProductsLoading || metafieldsLoading) return <Loading />;
-  if (error || productsError) return <ErrorMessage error={error || productsError} />;
+  if (isLoading || isProductsLoading || metafieldsLoading) {
+
+    return <Loading />;
+  }
+  if (error || productsError) {
+
+    return <ErrorMessage error={error || productsError} />;
+  }
 
   return (
     <>
