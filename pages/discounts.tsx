@@ -1,5 +1,5 @@
-import { Badge, Box, Button, Dropdown, Flex, FormGroup, H1, Input, Panel, MultiSelect, Table } from '@bigcommerce/big-design';
-import { useEffect, useMemo, useState } from 'react';
+import { Badge, Box, Button, Dropdown, Flex, FormGroup, H1, Input, MultiSelect, Panel, Table } from '@bigcommerce/big-design';
+import { useEffect, useState } from 'react';
 import { useSession } from '../context/session';
 
 type DiscountType = 'percent' | 'fixed';
@@ -19,12 +19,12 @@ export default function Discounts() {
   const { context } = useSession();
   // Discounts state (loaded from backend)
   const [discounts, setDiscounts] = useState<DiscountRow[]>([]);
-  const [discountsLoading, setDiscountsLoading] = useState(false);
+  
   const [discountsError, setDiscountsError] = useState<string | null>(null);
 
   const loadDiscounts = async () => {
     try {
-      setDiscountsLoading(true);
+      
       setDiscountsError(null);
       const res = await fetch(`/api/categories/discounts?context=${encodeURIComponent(context)}`);
       if (!res.ok) throw new Error('Failed to load discounts');
@@ -33,7 +33,7 @@ export default function Discounts() {
     } catch (err: any) {
       setDiscountsError(err?.message || 'Unable to fetch discounts');
     } finally {
-      setDiscountsLoading(false);
+      
     }
   };
 
@@ -75,6 +75,7 @@ export default function Discounts() {
   const formatValidity = (row: DiscountRow) => {
     const start = row.startDate ? new Date(row.startDate).toLocaleDateString() : '';
     const end = row.endDate ? new Date(row.endDate).toLocaleDateString() : 'Ongoing';
+    
     return `${start} - ${end}`.trim();
   };
 

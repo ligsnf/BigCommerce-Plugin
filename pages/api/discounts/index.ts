@@ -26,6 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'GET') {
       const rows = await sql`SELECT * FROM category_discounts WHERE store_hash = ${storeHash} ORDER BY created_at DESC`;
+      
       return res.status(200).json({ data: rows });
     }
 
@@ -33,6 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { name, categories, type, amount, startDate, endDate, status } = req.body || {};
 
       if (!name || !Array.isArray(categories) || !type || !amount) {
+
         return res.status(400).json({ message: 'Missing required fields' });
       }
 
@@ -55,10 +57,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     res.setHeader('Allow', 'GET, POST');
+
     return res.status(405).json({ message: 'Method not allowed' });
   } catch (error: any) {
     const status = error?.response?.status || 500;
     const message = error?.message || 'Internal server error';
+
     return res.status(status).json({ message });
   }
 }

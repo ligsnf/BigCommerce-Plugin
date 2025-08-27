@@ -59,18 +59,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Validate required fields
       if (!name || !type || !Array.isArray(categoryIds) || categoryIds.length === 0) {
+
         return res.status(400).json({ message: 'Missing required fields' });
       }
 
       // Enforce discount amount is required and valid
       const parsedAmount: number = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
       if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+
         return res.status(400).json({ message: 'Discount amount must be a number greater than 0' });
       }
       if (type !== 'percent' && type !== 'fixed') {
+
         return res.status(400).json({ message: 'Invalid discount type' });
       }
       if (type === 'percent' && parsedAmount > 100) {
+
         return res.status(400).json({ message: 'Percent discount cannot exceed 100' });
       }
 
@@ -97,10 +101,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Compute discounted price from base price
       const computeDiscounted = (base: number, t: 'percent' | 'fixed', a: number) => {
-        if (!base || base <= 0) return 0;
+        if (!base || base <= 0) 
+          
+          return 0;
         if (t === 'percent') {
+
           return round2(base * (1 - a / 100));
         }
+
         return round2(Math.max(0, base - a));
       };
 
@@ -160,10 +168,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     res.setHeader('Allow', 'GET, POST');
+
     return res.status(405).json({ message: 'Method not allowed' });
   } catch (error: any) {
     const status = error?.response?.status || 500;
     const message = error?.message || 'Internal server error';
+
     return res.status(status).json({ message });
   }
 }

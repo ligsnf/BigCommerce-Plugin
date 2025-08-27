@@ -325,6 +325,7 @@ const ProductAppExtension = () => {
                   const productWithVariant = products.find(p => p.variants && p.variants.some(v => v.id === vid));
                   if (productWithVariant) {
                     const variant = productWithVariant.variants.find(v => v.id === vid);
+                    
                     return {
                       value: vid,
                       label: `${productWithVariant.label} [${variant.option_values.map(ov => ov.label).join(' - ')}]`,
@@ -336,13 +337,13 @@ const ProductAppExtension = () => {
                     };
                   }
 
-                  // Could not resolve variant; fall back to product id labeling
                   return { value: pid, label: `Product ${pid}`, productId: pid, variantId: vid, quantity: qty, skuLabel: '' };
                 }
 
                 // Product-linked item (no variantId)
                 const match = products.find(p => p.value === pid);
                 const product = match ?? { value: pid, label: `Product ${pid}`, sku: '' };
+
                 return { ...product, value: pid, variantId: null, quantity: qty, skuLabel: (product as any).sku };
               }
 
@@ -350,6 +351,7 @@ const ProductAppExtension = () => {
               const pid = linkedProduct as number;
               const match = products.find(p => p.value === pid);
               const product = match ?? { value: pid, label: `Product ${pid}`, sku: '' };
+
               return { ...product, value: pid, variantId: null, quantity: 1, skuLabel: (product as any).sku };
             });
 
@@ -382,7 +384,9 @@ const ProductAppExtension = () => {
   const handleQuantityChange = (productId, quantity) => {
     // Find the product to get its variantId
     const product = linkedProducts.find(p => p.value === productId);
-    if (!product) return;
+    if (!product) 
+      
+      return;
 
     const key = product.variantId ? `${product.productId}-${product.variantId}` : productId.toString();
     setProductQuantities(prev => ({

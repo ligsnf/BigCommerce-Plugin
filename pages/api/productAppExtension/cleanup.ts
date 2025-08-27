@@ -10,12 +10,14 @@ type CleanupResult = {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
+
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
     const session = await getSession(req);
     if (!session) {
+
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
@@ -145,6 +147,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (productId) {
       const result = await processOne(Number(productId));
+
       return res.status(200).json({ results: [result] });
     }
 
@@ -159,8 +162,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ results });
   } catch (error: any) {
     console.error('[cleanup] Error:', error?.response?.data || error?.message || error);
+
     return res.status(error?.response?.status || 500).json({ message: error?.message || 'Cleanup failed' });
   }
 }
-
-
