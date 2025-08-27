@@ -258,7 +258,9 @@ const ProductAppExtension = () => {
                 // Fallback to finding by product ID
                 const match = products.find(p => p.value === productId);
 
-                return match ? { ...match, quantity } : { value: productId, label: `Product ${productId}`, quantity };
+                return match
+                  ? { ...match, quantity, skuLabel: match.sku }
+                  : { value: productId, label: `Product ${productId}`, quantity, skuLabel: '' };
               });
 
               // Set quantities from the linked products
@@ -322,7 +324,7 @@ const ProductAppExtension = () => {
               const match = products.find(p => p.value === id);
               const product = match ?? { value: id, label: `Product ${id}` };
 
-              return { ...product, quantity };
+              return { ...product, quantity, skuLabel: (product as any).sku };
             });
 
             // Set quantities from the mapped products
