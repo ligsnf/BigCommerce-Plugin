@@ -756,8 +756,7 @@ const ProductAppExtension = () => {
           try {
             // If embedded in an iframe (e.g., BigCommerce panel), try to reload the top-level page
             if (window.top && window.top !== window) {
-              // Using href assignment avoids some cross-origin reload issues
-              window.top.location.href = window.top.location.href;
+              window.top.location.reload();
 
               return;
             }
@@ -766,7 +765,7 @@ const ProductAppExtension = () => {
           }
 
           // Fallback: reload current window
-          window.location.href = window.location.href;
+          window.location.reload();
         }
       }, 1200);
     } catch (err) {
