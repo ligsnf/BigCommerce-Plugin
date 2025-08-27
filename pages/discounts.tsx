@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Dropdown, Flex, FormGroup, H1, Input, MultiSelect, Panel, Table } from '@bigcommerce/big-design';
+import { Badge, Box, Button, Flex, FormGroup, H1, Input, MultiSelect, Panel, Table } from '@bigcommerce/big-design';
 import { useEffect, useState } from 'react';
 import { useSession } from '../context/session';
 
@@ -21,6 +21,7 @@ export default function Discounts() {
   const [discounts, setDiscounts] = useState<DiscountRow[]>([]);
   
   const [discountsError, setDiscountsError] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<number | null>(null);
 
   const loadDiscounts = async () => {
     try {
@@ -70,12 +71,12 @@ export default function Discounts() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const formatValidity = (row: DiscountRow) => {
-    const start = row.startDate ? new Date(row.startDate).toLocaleDateString() : '';
-    const end = row.endDate ? new Date(row.endDate).toLocaleDateString() : 'Ongoing';
-
-    return `${start} - ${end}`.trim();
-  };
+  // const formatValidity = (row: DiscountRow) => {
+  //   const start = row.startDate ? new Date(row.startDate).toLocaleDateString() : '';
+  //   const end = row.endDate ? new Date(row.endDate).toLocaleDateString() : 'Ongoing';
+  //
+  //   return `${start} - ${end}`.trim();
+  // };
 
   const handleDeactivate = async (row: DiscountRow) => {
     try {
@@ -102,18 +103,19 @@ export default function Discounts() {
     { header: 'Category', hash: 'categories', render: ({ categories }: DiscountRow) => categories.join(', ') },
     { header: 'Type', hash: 'type', render: ({ type }: DiscountRow) => (type === 'percent' ? '%' : '$') },
     { header: 'Amount', hash: 'amount', render: ({ amount, type }: DiscountRow) => (type === 'percent' ? `${amount.toFixed(2)}%` : `$${amount.toFixed(2)}`) },
-    { header: 'Validity', hash: 'validity', render: (row: DiscountRow) => formatValidity(row) },
+    // { header: 'Validity', hash: 'validity', render: (row: DiscountRow) => formatValidity(row) },
     { header: 'Status', hash: 'status', render: ({ status }: DiscountRow) => (
       <Badge label={status} variant={status === 'Active' ? 'success' : 'secondary'} />
     ) },
     { header: '', hideHeader: true, hash: 'actions', render: (row: DiscountRow) => (
-      <Dropdown
-        toggle={<Button variant="subtle">Options</Button>}
-        items={[
-          { content: 'Deactivate', onItemClick: () => handleDeactivate(row), color: 'danger' },
-        ]}
-        placement="bottom-start"
-      />
+      confirmId === row.id ? (
+        <Box display="inline-flex" style={{ gap: 8 }}>
+          <Button variant="subtle" onClick={() => setConfirmId(null)}>Cancel</Button>
+          <Button actionType="destructive" onClick={() => { setConfirmId(null); handleDeactivate(row); }}>Confirm</Button>
+        </Box>
+      ) : (
+        <Button actionType="destructive" onClick={() => setConfirmId(row.id)}>Deactivate</Button>
+      )
     )},
   ];
 
@@ -135,7 +137,7 @@ export default function Discounts() {
           categoryIds: categoriesValue.map((v) => Number(v)),
         }),
       });
-      if (!res.ok) throw new Error('Failed to save discount');
+      if (!res.ok) throw new Error('Failed to apply discount');
       // Reset minimal fields and refresh list
       setDiscountName('');
       setCategoriesValue([]);
@@ -161,7 +163,7 @@ export default function Discounts() {
       <Panel>
         <Flex marginBottom="medium" justifyContent="space-between" alignItems="center">
           <H1 margin="none">Create Discount</H1>
-          <Button variant="primary" onClick={handleSave}>Save Discount</Button>
+          <Button variant="primary" onClick={handleSave}>Apply Discount</Button>
         </Flex>
 
         <Flex flexDirection="column" marginTop="none">
@@ -226,6 +228,7 @@ export default function Discounts() {
             />
           </FormGroup>
 
+          {/*
           <Flex>
             <FormGroup style={{ flex: 1, marginRight: 12 }}>
               <Input
@@ -246,6 +249,7 @@ export default function Discounts() {
               />
             </FormGroup>
           </Flex>
+          */}
         </Flex>
       </Panel>
     </Box>

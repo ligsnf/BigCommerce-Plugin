@@ -62,24 +62,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         page += 1;
       } while (page <= totalPages);
 
-      // Update category metafield status to Inactive if present
+      // Remove discount metafield from category if present
       try {
         const { data: mfs } = await bc.get(`/catalog/categories/${categoryId}/metafields`);
         const existing = (mfs || []).find((m: any) => m.namespace === NAMESPACE && m.key === KEY);
         if (existing) {
-          let value: any = null;
-          try {
-            value = typeof existing.value === 'string' ? JSON.parse(existing.value) : existing.value;
-          } catch {
-            value = existing.value;
-          }
-          const newVal = JSON.stringify({ ...(value || {}), status: 'Inactive' });
-          await bc.put(`/catalog/categories/${categoryId}/metafields/${existing.id}`, {
-            namespace: NAMESPACE,
-            key: KEY,
-            value: newVal,
-            permission_set: 'read_and_write',
-          });
+          await bc.delete(`/catalog/categories/${categoryId}/metafields/${existing.id}`);
         }
       } catch (e) {
         // Best-effort: ignore metafield update errors
