@@ -432,6 +432,7 @@ const ProductAppExtension = () => {
 
       if (hasMultipleVariants) {
         let anyVariantIsBundle = false;
+        let firstBundleVariantPrice: number | null = null;
         // Update each variant (do not change variant SKUs per new rules)
         for (const variant of variants) {
           // Save metafields for each variant
@@ -510,6 +511,9 @@ const ProductAppExtension = () => {
             const totalWeight = components.reduce((sum, c) => sum + c.weightContribution, 0);
             const calculatedPrice = components.reduce((sum, c) => sum + c.priceContribution, 0);
             const finalPrice = variantOverridePrices[variant.id] != null ? variantOverridePrices[variant.id] : calculatedPrice;
+            if (firstBundleVariantPrice == null) {
+              firstBundleVariantPrice = finalPrice;
+            }
             updatePromises.push(
               fetch(`/api/products/${productId}/variants/${variant.id}?context=${encodeURIComponent(context)}`, {
                 method: 'PUT',
@@ -540,6 +544,17 @@ const ProductAppExtension = () => {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ sku: newProductSku }),
+            })
+          );
+        }
+
+        // Set parent product price to the first bundle variant's price
+        if (firstBundleVariantPrice != null) {
+          updatePromises.push(
+            fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ price: firstBundleVariantPrice }),
             })
           );
         }
