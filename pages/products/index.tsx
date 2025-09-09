@@ -19,12 +19,6 @@ const Products = () => {
     const storeHash = context ? JSON.parse(atob(context.split('.')[1])).context : null;
 
     useEffect(() => {
-        // Log to browser console
-        console.log('%c[Products Page]', 'color: #4CAF50; font-weight: bold');
-        console.log('Environment:', process.env.NODE_ENV);
-        console.log('Session Context:', context);
-        console.log('Store Hash:', storeHash);
-        console.log('Full URL:', window.location.href);
     }, [context, storeHash]);
 
     const { error, isLoading, list = [], meta = {} } = useProductList({

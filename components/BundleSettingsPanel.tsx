@@ -114,11 +114,6 @@ const BundleSettingsPanel = ({
     onVariantSelect(variant);
   };
 
-  // Debug: log prop/state changes outside of JSX to avoid returning void in render
-  if (process.env.NODE_ENV !== 'production') {
-    // eslint-disable-next-line no-console
-    console.log('[Panel props] isBundle:', isBundle, { hasMultipleVariants, selectedVariantId: selectedVariant?.id ?? null });
-  }
 
   return (
     <Panel header={header}>
@@ -126,11 +121,7 @@ const BundleSettingsPanel = ({
         <H4>Is this product a bundle?</H4>
         <Switch
           checked={isBundle}
-          onChange={() => {
-            // eslint-disable-next-line no-console
-            console.log('[UI] Switch onChange fired');
-            onBundleToggle();
-          }}
+          onChange={onBundleToggle}
           disabled={isToggleDisabled}
         />
       </Box>
