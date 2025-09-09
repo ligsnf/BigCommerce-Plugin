@@ -6,6 +6,7 @@ interface BundleSettingsPanelProps {
   header?: string;
   isBundle: boolean;
   onBundleToggle: () => void;
+  isToggleDisabled?: boolean;
   combinedOptions: any[];
   selectedItem: any;
   onItemSelect: (item: any) => void;
@@ -34,6 +35,7 @@ const BundleSettingsPanel = ({
   header,
   isBundle,
   onBundleToggle,
+  isToggleDisabled,
   combinedOptions,
   selectedItem,
   onItemSelect,
@@ -65,11 +67,58 @@ const BundleSettingsPanel = ({
       : linkedProducts.length > 0
   );
 
+  const getUnitPrice = (item: any) => {
+    // Try to resolve price from variants first (if variantId present), then fallback to product price
+    const pid = item.productId ?? item.value;
+    const vid = item.variantId ?? null;
+    const product = products.find((p: any) => p.value === pid);
+    if (!product) {
+      return Number(item.price ?? 0);
+    }
+
+    if (vid && Array.isArray(product.variants)) {
+      const variant = product.variants.find((v: any) => v.id === vid);
+      if (variant && variant.price != null) {
+        return Number(variant.price);
+      }
+    }
+
+    return Number(product.price ?? item.price ?? 0);
+  };
+
+  const formatPrice = (value: number) => `$${(Number(value) || 0).toFixed(2)}`;
+
+  const calculateMainBundlePrice = () => {
+    if (!isBundle) return 0;
+    return (linkedProducts || []).reduce((sum: number, p: any) => {
+      const key = p.variantId ? `${p.productId ?? p.value}-${p.variantId}` : (p.value ?? '').toString();
+      const qty = (productQuantities?.[key] ?? 1) as number;
+      return sum + getUnitPrice(p) * Math.max(1, Number(qty) || 1);
+    }, 0);
+  };
+
+  const calculateVariantBundlePrice = () => {
+    if (!isBundle || !selectedVariant) return 0;
+    const items = variantLinkedProducts?.[selectedVariant.id] || [];
+    const quantities = variantProductQuantities?.[selectedVariant.id] || {};
+    return items.reduce((sum: number, p: any) => {
+      const key = p.variantId ? `${p.productId ?? p.value}-${p.variantId}` : (p.value ?? '').toString();
+      const qty = (quantities?.[key] ?? 1) as number;
+      return sum + getUnitPrice(p) * Math.max(1, Number(qty) || 1);
+    }, 0);
+  };
+
   const handleVariantSelect = (variant) => {
     // Clear the selected item when switching variants
     onItemSelect(null);
     onVariantSelect(variant);
   };
+
+  // Debug: log prop/state changes outside of JSX to avoid returning void in render
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.log('[Panel props] isBundle:', isBundle, { hasMultipleVariants, selectedVariantId: selectedVariant?.id ?? null });
+  }
 
   return (
     <Panel header={header}>
@@ -77,7 +126,12 @@ const BundleSettingsPanel = ({
         <H4>Is this product a bundle?</H4>
         <Switch
           checked={isBundle}
-          onChange={onBundleToggle}
+          onChange={() => {
+            // eslint-disable-next-line no-console
+            console.log('[UI] Switch onChange fired');
+            onBundleToggle();
+          }}
+          disabled={isToggleDisabled}
         />
       </Box>
 
@@ -122,6 +176,10 @@ const BundleSettingsPanel = ({
                     onRemoveProduct={(productId) => onVariantRemoveProduct(selectedVariant.id, productId)}
                   />
 
+                  <Box marginTop="small">
+                    <Small>Calculated Price: {formatPrice(calculateVariantBundlePrice())}</Small>
+                  </Box>
+
                   <Box marginTop="medium">
                     <Input
                       label="Override Price"
@@ -156,6 +214,10 @@ const BundleSettingsPanel = ({
             onRemoveProduct={onRemoveProduct}
           />
 
+          <Box marginTop="small">
+            <Small>Calculated Price: {formatPrice(calculateMainBundlePrice())}</Small>
+          </Box>
+
           <Box marginTop="medium">
             <Input
               label="Override Price"
@@ -177,6 +239,12 @@ const BundleSettingsPanel = ({
       {isBundle && hasMultipleVariants && !canSave && (
         <Box marginBottom="xxSmall">
           <Small color="danger">All variants must have products in order to save.</Small>
+        </Box>
+      )}
+
+      {wasBundleOnLoad && !isBundle && (
+        <Box marginBottom="xxSmall">
+          <Small color="danger">Saving will remove the bundle status for this product.</Small>
         </Box>
       )}
 

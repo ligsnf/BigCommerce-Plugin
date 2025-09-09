@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import BundleSettingsPanel from '@components/BundleSettingsPanel';
@@ -49,9 +48,6 @@ const ProductAppExtension = () => {
       try {
         const res = await fetch(`/api/bundles/list?context=${encodeURIComponent(context)}`);
         if (!res.ok) {
-          // eslint-disable-next-line no-console
-          console.warn('Failed to load bundles list:', await res.text());
-          
           return;
         }
         const data = await res.json();
@@ -69,8 +65,7 @@ const ProductAppExtension = () => {
         setBundleProductIds(productIds);
         setBundleVariantIds(variantIds);
       } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error('Error fetching bundles list:', e);
+        // Error fetching bundles list
       }
     }
 
@@ -201,35 +196,27 @@ const ProductAppExtension = () => {
       try {
         setMetafieldsLoading(true);
         const hasMultipleVariants = variants.length > 1;
-        console.log('Initial load - Product data:', {
-          productId,
-          hasMultipleVariants,
-          variants,
-          products
-        });
 
         if (hasMultipleVariants) {
           // Fetch metafields for each variant
           const variantMetafieldsPromises = variants.map(async (variant) => {
+            const cacheKey = `variant:metafields:${productId}:${variant.id}:${context}`;
+            const cached = (() => {
+              try { return JSON.parse(localStorage.getItem(cacheKey) || 'null'); } catch { return null; }
+            })();
+            if (cached && cached.expiresAt > Date.now()) {
+              return cached.value;
+            }
             const res = await fetch(`/api/productAppExtension/${productId}/variants/${variant.id}/metafields?context=${encodeURIComponent(context)}`);
             if (!res.ok) {
-              console.warn(`Failed to load metafields for variant ${variant.id}:`, await res.text());
-
               return null;
             }
-
-            return res.json();
+            const json = await res.json();
+            try { localStorage.setItem(cacheKey, JSON.stringify({ value: json, expiresAt: Date.now() + 120000 })); } catch {}
+            return json;
           });
 
           const variantMetafieldsResults = await Promise.all(variantMetafieldsPromises);
-          console.log('Variant metafields results:', variantMetafieldsResults);
-          console.log('Variant-level bundle linked_product_ids (raw) by variant:',
-            variants.map((v, i) => ({
-              variantId: v.id,
-              isBundle: Boolean(variantMetafieldsResults[i]?.isBundle),
-              linkedProductIds: variantMetafieldsResults[i]?.linkedProductIds ?? null,
-            }))
-          );
 
           // Process variant metafields
           const variantData = {};
@@ -287,11 +274,6 @@ const ProductAppExtension = () => {
             }
           });
 
-          console.log('Processed variant data:', {
-            variantData,
-            variantQuantities,
-            variantProducts
-          });
 
           setVariantLinkedProducts(variantProducts);
           setVariantProductQuantities(variantQuantities);
@@ -303,12 +285,20 @@ const ProductAppExtension = () => {
           setWasBundleOnLoad(anyVariantBundle);
         } else {
           // For products without variants, fetch product metafields
-          const res = await fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`);
-          const data = await res.json();
-          console.log('Product metafields data:', data);
-          console.log('Product-level bundle linked_product_ids (raw):', data?.linkedProductIds ?? null);
+          const cacheKey = `product:metafields:${productId}:${context}`;
+          const cached = (() => { try { return JSON.parse(localStorage.getItem(cacheKey) || 'null'); } catch { return null; } })();
+          let data;
+          let ok = true;
+          if (cached && cached.expiresAt > Date.now()) {
+            data = cached.value;
+          } else {
+            const response = await fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`);
+            ok = response.ok;
+            data = await response.json();
+            try { localStorage.setItem(cacheKey, JSON.stringify({ value: data, expiresAt: Date.now() + 120000 })); } catch {}
+          }
 
-          if (res.ok) {
+          if (ok) {
             setIsBundle(data.isBundle);
             setWasBundleOnLoad(Boolean(data.isBundle));
             setOverridePrice(data.overridePrice ?? null);
@@ -364,14 +354,11 @@ const ProductAppExtension = () => {
             );
 
             setProductQuantities(quantities);
-            console.log('Mapped products for table:', mappedProducts);
             setLinkedProducts(mappedProducts);
-          } else {
-            console.warn('Failed to load metafields:', data.message);
           }
         }
       } catch (err) {
-        console.error('Error fetching metafields:', err);
+        // Error fetching metafields
       } finally {
         setMetafieldsLoading(false);
       }
@@ -380,6 +367,12 @@ const ProductAppExtension = () => {
     fetchMetafields();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId, products.length, variants]);
+
+
+  // Helper to toggle bundle status
+  const handleBundleToggle = () => {
+    setIsBundle(prev => !prev);
+  };
 
   const handleQuantityChange = (productId, quantity) => {
     // Find the product to get its variantId
@@ -455,7 +448,6 @@ const ProductAppExtension = () => {
             }) : []
           };
 
-          console.log(`Saving metafields for variant ${variant.id}:`, JSON.stringify(variantMetafieldsData, null, 2));
 
           updatePromises.push(
             fetch(`/api/productAppExtension/${productId}/variants/${variant.id}/metafields?context=${encodeURIComponent(context)}`, {
@@ -475,8 +467,6 @@ const ProductAppExtension = () => {
                 const compProductId = p.productId || p.value;
                 const res = await fetch(`/api/products/${compProductId}?context=${encodeURIComponent(context)}`);
                 if (!res.ok) {
-                  console.warn(`Failed to fetch product ${compProductId}`);
-
                   return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
                 }
                 const data = await res.json();
@@ -487,8 +477,6 @@ const ProductAppExtension = () => {
                 if (data.variants && data.variants.length > 0 && p.variantId) {
                   const variantRes = await fetch(`/api/products/${compProductId}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
                   if (!variantRes.ok) {
-                    console.warn(`Failed to fetch variant ${p.variantId} of product ${compProductId}`);
-
                     return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
                   }
                   const variantData = await variantRes.json();
@@ -595,8 +583,7 @@ const ProductAppExtension = () => {
             }
           }
         } catch (e) {
-          // eslint-disable-next-line no-console
-          console.warn('Failed to ensure/update Bundle category for product with variants:', e);
+          // Failed to ensure/update Bundle category for product with variants
         }
       } else {
         // For products without variants, save at product level
@@ -617,7 +604,6 @@ const ProductAppExtension = () => {
 
         metafieldsData.overridePrice = isActuallyBundle ? (overridePrice ?? null) : null;
 
-        console.log('Saving metafields for main product:', JSON.stringify(metafieldsData, null, 2));
 
         updatePromises.push(
           fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`, {
@@ -636,8 +622,6 @@ const ProductAppExtension = () => {
               const compProductId = p.productId || p.value;
               const res = await fetch(`/api/products/${compProductId}?context=${encodeURIComponent(context)}`);
               if (!res.ok) {
-                console.warn(`Failed to fetch product ${compProductId}`);
-
                 return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
               }
               const data = await res.json();
@@ -645,8 +629,6 @@ const ProductAppExtension = () => {
               if (data.variants && data.variants.length > 0 && p.variantId) {
                 const variantRes = await fetch(`/api/products/${compProductId}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
                 if (!variantRes.ok) {
-                  console.warn(`Failed to fetch variant ${p.variantId} of product ${compProductId}`);
-
                   return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
                 }
                 const variantData = await variantRes.json();
@@ -699,8 +681,7 @@ const ProductAppExtension = () => {
               }
             }
           } catch (e) {
-            // eslint-disable-next-line no-console
-            console.warn('Failed to ensure/add Bundle category for product:', e);
+            // Failed to ensure/add Bundle category for product
           }
         } else {
           updateData.inventory_tracking = "none";
@@ -720,8 +701,7 @@ const ProductAppExtension = () => {
               }
             }
           } catch (e) {
-            // eslint-disable-next-line no-console
-            console.warn('Failed to remove Bundle category for non-bundle product:', e);
+            // Failed to remove Bundle category for non-bundle product
           }
         }
 
@@ -769,7 +749,6 @@ const ProductAppExtension = () => {
         }
       }, 1200);
     } catch (err) {
-      console.error('Save error:', err);
       alertsManager.add({
         messages: [{ text: 'Failed to save changes.' }],
         type: 'error',
@@ -794,7 +773,8 @@ const ProductAppExtension = () => {
       <BundleSettingsPanel
         header={name}
         isBundle={isBundle}
-        onBundleToggle={() => setIsBundle(prev => !prev)}
+        onBundleToggle={handleBundleToggle}
+        isToggleDisabled={metafieldsLoading || saving}
         combinedOptions={combinedOptions}
         selectedItem={selectedItem}
         onItemSelect={handleItemSelect}
