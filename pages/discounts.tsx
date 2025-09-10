@@ -1,4 +1,5 @@
-import { Badge, Box, Button, Flex, FormGroup, H1, Input, MultiSelect, Panel, Table } from '@bigcommerce/big-design';
+import { Badge, Box, Button, Dropdown, Flex, FormGroup, H1, Input, MultiSelect, Panel, Table } from '@bigcommerce/big-design';
+import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
 import { useEffect, useState } from 'react';
 import { useSession } from '../context/session';
 
@@ -23,7 +24,6 @@ export default function Discounts() {
   const [discounts, setDiscounts] = useState<DiscountRow[]>([]);
   const [discountsLoading, setDiscountsLoading] = useState(false);
   const [discountsError, setDiscountsError] = useState<string | null>(null);
-  const [confirmId, setConfirmId] = useState<number | null>(null);
 
   const checkAndActivateScheduledDiscounts = async () => {
     if (!context) {
@@ -153,6 +153,59 @@ export default function Discounts() {
     }
   };
 
+  const handleDelete = async (row: DiscountRow) => {
+    try {
+      const res = await fetch(`/api/categories/discounts/delete?context=${encodeURIComponent(context)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryIds: categoryOptions
+            .filter((opt) => row.categories.includes(opt.content))
+            .map((opt) => Number(opt.value)),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || 'Failed to delete');
+      await loadDiscounts();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error(e);
+    }
+  };
+
+  const handleReuse = (row: DiscountRow) => {
+    // Populate form with the selected discount's details
+    setDiscountName(row.name);
+    setDiscountType(row.type);
+    setAmount(row.amount.toString());
+    
+    // Set categories - find the category IDs that match the category names
+    const matchingCategoryIds = categoryOptions
+      .filter(opt => row.categories.includes(opt.content))
+      .map(opt => opt.value);
+    setCategoriesValue(matchingCategoryIds);
+    
+    // Set timing based on whether it has scheduled time
+    if (row.scheduledTime) {
+      setApplyImmediately(false);
+      setScheduledTime(new Date(row.scheduledTime).toISOString().slice(0, 16));
+    } else {
+      setApplyImmediately(true);
+      setScheduledTime('');
+    }
+    
+    // Set end datetime if it exists
+    if (row.endDateTime) {
+      setEndDateTime(new Date(row.endDateTime).toISOString().slice(0, 16));
+    } else {
+      setEndDateTime('');
+    }
+    
+    // Clear start/end dates (these are legacy fields)
+    setStartDate('');
+    setEndDate('');
+  };
+
   const formatScheduledTime = (scheduledTime?: string) => {
     if (!scheduledTime) return '';
     const date = new Date(scheduledTime);
@@ -193,14 +246,29 @@ export default function Discounts() {
       />
     ) },
     { header: '', hideHeader: true, hash: 'actions', render: (row: DiscountRow) => (
-      confirmId === row.id ? (
-        <Box display="inline-flex" style={{ gap: 8 }}>
-          <Button variant="subtle" onClick={() => setConfirmId(null)}>Cancel</Button>
-          <Button actionType="destructive" onClick={() => { setConfirmId(null); handleDeactivate(row); }}>Confirm</Button>
-        </Box>
-      ) : (
-        <Button actionType="destructive" onClick={() => setConfirmId(row.id)}>Deactivate</Button>
-      )
+      <Dropdown
+        items={[
+          { 
+            content: 'Reuse', 
+            onItemClick: () => handleReuse(row), 
+            hash: 'reuse',
+            disabled: row.status !== 'Inactive'
+          },
+          { 
+            content: 'Deactivate', 
+            onItemClick: () => handleDeactivate(row), 
+            hash: 'deactivate',
+            disabled: row.status === 'Inactive'
+          },
+          { 
+            content: 'Delete', 
+            onItemClick: () => handleDelete(row), 
+            hash: 'delete',
+            actionType: 'destructive'
+          }
+        ]}
+        toggle={<Button iconOnly={<MoreHorizIcon color="secondary60" />} variant="subtle" />}
+      />
     )},
   ];
 
