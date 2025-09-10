@@ -103,7 +103,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('Error activating scheduled discounts:', error);
     const status = error?.response?.status || 500;
     const message = error?.message || 'Internal server error';
-    return res.status(status).json({ message });
+    
+return res.status(status).json({ message });
   }
 }
 
@@ -119,7 +120,8 @@ async function applyDiscountToCategory(bc: any, categoryId: number, rule: any) {
     if (t === 'percent') {
       return round2(base * (1 - a / 100));
     }
-    return round2(Math.max(0, base - a));
+    
+return round2(Math.max(0, base - a));
   };
 
   // Convert yyyy-mm-dd to ISO date range fields (start at 00:00:00Z, end at 23:59:59Z)

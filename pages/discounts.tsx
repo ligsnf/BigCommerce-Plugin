@@ -28,7 +28,8 @@ export default function Discounts() {
   const checkAndActivateScheduledDiscounts = async () => {
     if (!context) {
       console.log('No context available, skipping scheduled discount check');
-      return;
+      
+return;
     }
     
     try {
@@ -237,7 +238,8 @@ export default function Discounts() {
     const year = date.getFullYear();
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
+    
+return `${day}/${month}/${year} ${hours}:${minutes}`;
   };
 
   const formatEndDateTime = (endDateTime?: string) => {
@@ -248,7 +250,8 @@ export default function Discounts() {
     const year = date.getFullYear();
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
+    
+return `${day}/${month}/${year} ${hours}:${minutes}`;
   };
 
   const columns = [
@@ -308,25 +311,29 @@ export default function Discounts() {
       // Validate discount type selection
       if (!discountType) {
         alert('Please select a discount type');
-        return;
+        
+return;
       }
 
       // Validate discount amount
       const amountValue = Number(amount);
       if (discountType === 'percent' && (amountValue < 0 || amountValue > 100)) {
         alert('Percentage discount must be between 0 and 100');
-        return;
+        
+return;
       }
 
       if (amountValue <= 0) {
         alert('Discount amount must be greater than 0');
-        return;
+        
+return;
       }
 
       // Validate scheduled time if scheduling
       if (applyMode === 'schedule' && !scheduledTime) {
         alert('Please select a scheduled time for the discount');
-        return;
+        
+return;
       }
 
       if (applyMode === 'schedule') {
@@ -334,7 +341,8 @@ export default function Discounts() {
         const now = new Date();
         if (scheduledDate <= now) {
           alert('Scheduled time must be in the future');
-          return;
+          
+return;
         }
       }
 
@@ -344,7 +352,8 @@ export default function Discounts() {
         const now = new Date();
         if (endDate <= now) {
           alert('End datetime must be in the future');
-          return;
+          
+return;
         }
         
         // If scheduled, end datetime must be after scheduled time
@@ -352,7 +361,8 @@ export default function Discounts() {
           const scheduledDate = new Date(scheduledTime);
           if (endDate <= scheduledDate) {
             alert('End datetime must be after the scheduled start time');
-            return;
+            
+return;
           }
         }
       }
@@ -365,7 +375,8 @@ export default function Discounts() {
             `${categoriesValue.length} Categories`) : 
           'Category';
         const discountNumber = Math.floor(Math.random() * 1000) + 1;
-        return `${categoryText} - ${discountNumber}`;
+        
+return `${categoryText} - ${discountNumber}`;
       })();
 
       const body = {

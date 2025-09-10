@@ -8,9 +8,11 @@ const getCache = (key: string) => {
   if (!entry) return null;
   if (Date.now() > entry.expiresAt) {
     serverCache.delete(key);
-    return null;
+    
+return null;
   }
-  return entry.value;
+  
+return entry.value;
 };
 const setCache = (key: string, value: any, ttlMs = 60_000) => {
   serverCache.set(key, { value, expiresAt: Date.now() + ttlMs });
@@ -34,7 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const cached = getCache(cacheKey);
     if (cached) {
       res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=120');
-      return res.status(200).json(cached);
+      
+return res.status(200).json(cached);
     }
 
     // Fetch all products

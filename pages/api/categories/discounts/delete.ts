@@ -48,7 +48,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('Error deleting discount:', error);
     const status = error?.response?.status || 500;
     const message = error?.message || 'Internal server error';
-    return res.status(status).json({ message });
+    
+return res.status(status).json({ message });
   }
 }
 
