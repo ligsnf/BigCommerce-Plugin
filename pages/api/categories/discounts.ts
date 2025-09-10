@@ -34,6 +34,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           amount: r.rule?.amount,
           startDate: r.rule?.startDate || null,
           endDate: r.rule?.endDate || null,
+          scheduledTime: r.rule?.scheduledTime || null,
+          endDateTime: r.rule?.endDateTime || null,
           status: r.rule?.status || 'Active',
         });
 
@@ -44,6 +46,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             amount: Number(r.rule?.amount || 0),
             startDate: r.rule?.startDate || undefined,
             endDate: r.rule?.endDate || undefined,
+            scheduledTime: r.rule?.scheduledTime || undefined,
+            endDateTime: r.rule?.endDateTime || undefined,
             status: r.rule?.status || 'Active',
             categories: [] as string[],
           };
@@ -55,12 +59,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
-      const { name, type, amount, startDate, endDate, status = 'Active', categoryIds = [] } = req.body || {};
+      const { name, type, amount, startDate, endDate, scheduledTime, endDateTime, status = 'Active', categoryIds = [] } = req.body || {};
 
       // Validate required fields
       if (!name || !type || !Array.isArray(categoryIds) || categoryIds.length === 0) {
 
         return res.status(400).json({ message: 'Missing required fields' });
+      }
+
+      // Validate scheduled time if provided
+      if (scheduledTime) {
+        const scheduledDate = new Date(scheduledTime);
+        const now = new Date();
+        if (isNaN(scheduledDate.getTime()) || scheduledDate <= now) {
+          return res.status(400).json({ message: 'Scheduled time must be a valid future date' });
+        }
+      }
+
+      // Validate end datetime if provided
+      if (endDateTime) {
+        const endDate = new Date(endDateTime);
+        const now = new Date();
+        if (isNaN(endDate.getTime()) || endDate <= now) {
+          return res.status(400).json({ message: 'End datetime must be a valid future date' });
+        }
+        
+        // If scheduled, end datetime must be after scheduled time
+        if (scheduledTime) {
+          const scheduledDate = new Date(scheduledTime);
+          if (endDate <= scheduledDate) {
+            return res.status(400).json({ message: 'End datetime must be after the scheduled start time' });
+          }
+        }
       }
 
       // Enforce discount amount is required and valid
@@ -81,8 +111,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const payload = {
         namespace: NAMESPACE,
         key: KEY,
-        value: JSON.stringify({ name, type, amount: parsedAmount, startDate, endDate, status }),
-        permission_set: 'read_and_write',
+        value: JSON.stringify({ name, type, amount: parsedAmount, startDate, endDate, scheduledTime, endDateTime, status }),
+        permission_set: 'app_only',
       };
 
       // Save/Update the metafield rule for each category (keeps UI listing intact)
@@ -94,6 +124,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } else {
           await bc.post(`/catalog/categories/${id}/metafields`, payload);
         }
+      }
+
+      // If this is a scheduled discount, don't apply price changes yet
+      if (scheduledTime) {
+        return res.status(201).json({ 
+          ok: true, 
+          appliedToCategories: categoryIds,
+          message: 'Discount scheduled successfully. It will be activated at the specified time.'
+        });
       }
 
       // Helper to round to 2 decimals consistently
