@@ -215,7 +215,7 @@ async function updateAffectedBundles(productId: number, orderedQuantity: number,
         minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
       }
     }
-    const bundleProductResponse = await bc.put(`/catalog/products/${bundle.id}`, {
+    await bc.put(`/catalog/products/${bundle.id}`, {
       inventory_level: minPossibleBundles
     });
   }
@@ -237,7 +237,7 @@ async function updateAffectedBundles(productId: number, orderedQuantity: number,
         minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
       }
     }
-    const bundleVariantResponse = await bc.put(`/catalog/products/${bundle.productId}/variants/${bundle.variantId}`, {
+    await bc.put(`/catalog/products/${bundle.productId}/variants/${bundle.variantId}`, {
       inventory_level: minPossibleBundles
     });
   }
