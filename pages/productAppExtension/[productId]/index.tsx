@@ -374,6 +374,41 @@ const ProductAppExtension = () => {
     setIsBundle(prev => !prev);
   };
 
+  // Helper to get SKUs from linked products
+  const getSkusFromLinkedProducts = async (linkedProducts: any[]) => {
+    const skus: string[] = [];
+    
+    for (const p of linkedProducts) {
+      const compProductId = p.productId || p.value;
+      try {
+        const res = await fetch(`/api/products/${compProductId}?context=${encodeURIComponent(context)}`);
+        if (res.ok) {
+          const data = await res.json();
+          
+          if (data.variants && data.variants.length > 0 && p.variantId) {
+            // Get variant SKU
+            const variantRes = await fetch(`/api/products/${compProductId}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
+            if (variantRes.ok) {
+              const variantData = await variantRes.json();
+              if (variantData.sku) {
+                skus.push(variantData.sku);
+              }
+            }
+          } else {
+            // Get product SKU
+            if (data.sku) {
+              skus.push(data.sku);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching SKU for product ${compProductId}:`, error);
+      }
+    }
+    
+    return skus;
+  };
+
   const handleQuantityChange = (productId, quantity) => {
     // Find the product to get its variantId
     const product = linkedProducts.find(p => p.value === productId);
@@ -506,6 +541,10 @@ const ProductAppExtension = () => {
             if (firstBundleVariantWeight == null) {
               firstBundleVariantWeight = totalWeight;
             }
+            // Get SKUs from linked products for this variant bundle
+            const variantSkus = await getSkusFromLinkedProducts(currentVariantProducts);
+            const newVariantSku = variantSkus.length > 0 ? variantSkus.join(' & ') : variant.sku;
+
             updatePromises.push(
               fetch(`/api/products/${productId}/variants/${variant.id}?context=${encodeURIComponent(context)}`, {
                 method: 'PUT',
@@ -514,6 +553,7 @@ const ProductAppExtension = () => {
                   inventory_level: minStock,
                   weight: totalWeight,
                   price: finalPrice,
+                  sku: newVariantSku,
                 }),
               })
             );
@@ -661,10 +701,16 @@ const ProductAppExtension = () => {
           const totalWeight = components.reduce((sum, c) => sum + c.weightContribution, 0);
           const calculatedPrice = components.reduce((sum, c) => sum + c.priceContribution, 0);
           const finalPrice = overridePrice != null ? overridePrice : calculatedPrice;
+          
+          // Get SKUs from linked products for this non-variant bundle
+          const bundleSkus = await getSkusFromLinkedProducts(linkedProducts);
+          const newBundleSku = bundleSkus.length > 0 ? bundleSkus.join(' & ') : product?.sku;
+          
           updateData.inventory_level = minStock;
           updateData.inventory_tracking = "product";
           updateData.weight = totalWeight;
           updateData.price = finalPrice;
+          updateData.sku = newBundleSku;
           updateData.is_visible = true;
           // Ensure product has the 'Bundle' category
           try {

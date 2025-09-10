@@ -117,13 +117,13 @@ export default function Discounts() {
   // Simple form state (UI only for now)
   const [discountName, setDiscountName] = useState('');
   const [categoriesValue, setCategoriesValue] = useState<string[]>([]);
-  const [discountType, setDiscountType] = useState<DiscountType>('percent');
+  const [discountType, setDiscountType] = useState<DiscountType | null>(null);
   const [amount, setAmount] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [endDateTime, setEndDateTime] = useState('');
-  const [applyImmediately, setApplyImmediately] = useState(true);
+  const [applyMode, setApplyMode] = useState<'create' | 'apply' | 'schedule'>('create');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // const formatValidity = (row: DiscountRow) => {
@@ -132,6 +132,26 @@ export default function Discounts() {
   //
   //   return `${start} - ${end}`.trim();
   // };
+
+  const handleActivate = async (row: DiscountRow) => {
+    try {
+      const res = await fetch(`/api/categories/discounts/activate?context=${encodeURIComponent(context)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryIds: categoryOptions
+            .filter((opt) => row.categories.includes(opt.content))
+            .map((opt) => Number(opt.value)),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || 'Failed to activate');
+      await loadDiscounts();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error(e);
+    }
+  };
 
   const handleDeactivate = async (row: DiscountRow) => {
     try {
@@ -185,12 +205,15 @@ export default function Discounts() {
       .map(opt => opt.value);
     setCategoriesValue(matchingCategoryIds);
     
-    // Set timing based on whether it has scheduled time
-    if (row.scheduledTime) {
-      setApplyImmediately(false);
+    // Set timing based on status and scheduled time
+    if (row.status === 'Scheduled' && row.scheduledTime) {
+      setApplyMode('schedule');
       setScheduledTime(new Date(row.scheduledTime).toISOString().slice(0, 16));
+    } else if (row.status === 'Active') {
+      setApplyMode('apply');
+      setScheduledTime('');
     } else {
-      setApplyImmediately(true);
+      setApplyMode('create');
       setScheduledTime('');
     }
     
@@ -249,6 +272,12 @@ export default function Discounts() {
       <Dropdown
         items={[
           { 
+            content: 'Activate', 
+            onItemClick: () => handleActivate(row), 
+            hash: 'activate',
+            disabled: row.status !== 'Inactive'
+          },
+          { 
             content: 'Reuse', 
             onItemClick: () => handleReuse(row), 
             hash: 'reuse',
@@ -276,6 +305,12 @@ export default function Discounts() {
     try {
       setIsSubmitting(true);
       
+      // Validate discount type selection
+      if (!discountType) {
+        alert('Please select a discount type');
+        return;
+      }
+
       // Validate discount amount
       const amountValue = Number(amount);
       if (discountType === 'percent' && (amountValue < 0 || amountValue > 100)) {
@@ -288,13 +323,13 @@ export default function Discounts() {
         return;
       }
 
-      // Validate scheduled time if not applying immediately
-      if (!applyImmediately && !scheduledTime) {
+      // Validate scheduled time if scheduling
+      if (applyMode === 'schedule' && !scheduledTime) {
         alert('Please select a scheduled time for the discount');
         return;
       }
 
-      if (!applyImmediately) {
+      if (applyMode === 'schedule') {
         const scheduledDate = new Date(scheduledTime);
         const now = new Date();
         if (scheduledDate <= now) {
@@ -313,7 +348,7 @@ export default function Discounts() {
         }
         
         // If scheduled, end datetime must be after scheduled time
-        if (!applyImmediately && scheduledTime) {
+        if (applyMode === 'schedule' && scheduledTime) {
           const scheduledDate = new Date(scheduledTime);
           if (endDate <= scheduledDate) {
             alert('End datetime must be after the scheduled start time');
@@ -339,9 +374,9 @@ export default function Discounts() {
         amount: Number(amount),
         startDate: startDate || null,
         endDate: endDate || null,
-        scheduledTime: applyImmediately ? null : scheduledTime,
+        scheduledTime: applyMode === 'schedule' ? scheduledTime : null,
         endDateTime: endDateTime || null,
-        status: applyImmediately ? 'Active' : 'Scheduled',
+        status: applyMode === 'create' ? 'Inactive' : applyMode === 'apply' ? 'Active' : 'Scheduled',
       };
       
       const requestBody = {
@@ -368,12 +403,13 @@ export default function Discounts() {
       // Reset minimal fields and refresh list
       setDiscountName('');
       setCategoriesValue([]);
+      setDiscountType(null);
       setAmount('');
       setStartDate('');
       setEndDate('');
       setScheduledTime('');
       setEndDateTime('');
-      setApplyImmediately(true);
+      setApplyMode('create');
       await loadDiscounts();
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -400,20 +436,7 @@ export default function Discounts() {
       </Panel>
 
       <Panel>
-        <Flex marginBottom="medium" justifyContent="space-between" alignItems="center">
-          <H1 margin="none">Create Discount</H1>
-          <Button 
-            variant="primary" 
-            onClick={handleSave}
-            disabled={isSubmitting}
-            isLoading={isSubmitting}
-          >
-            {isSubmitting 
-              ? (applyImmediately ? 'Applying...' : 'Scheduling...') 
-              : (applyImmediately ? 'Apply Discount' : 'Schedule Discount')
-            }
-          </Button>
-        </Flex>
+        <H1 margin="none" marginBottom="medium">Create Discount</H1>
 
         <Flex flexDirection="column" marginTop="none">
           <FormGroup>
@@ -425,6 +448,39 @@ export default function Discounts() {
               onChange={(e) => setDiscountName(e.target.value)}
               disabled={isSubmitting}
             />
+          </FormGroup>
+
+          <FormGroup>
+            <Flex alignItems="center">
+              <Box marginRight="medium" style={{ fontWeight: 'bold' }}>Apply Mode</Box>
+              <Box marginRight="small">
+                <Button
+                  variant={applyMode === 'create' ? "primary" : "secondary"}
+                  onClick={() => setApplyMode('create')}
+                  disabled={isSubmitting}
+                >
+                  Create Only
+                </Button>
+              </Box>
+              <Box marginRight="small">
+                <Button
+                  variant={applyMode === 'apply' ? "primary" : "secondary"}
+                  onClick={() => setApplyMode('apply')}
+                  disabled={isSubmitting}
+                >
+                  Apply Now
+                </Button>
+              </Box>
+              <Box>
+                <Button
+                  variant={applyMode === 'schedule' ? "primary" : "secondary"}
+                  onClick={() => setApplyMode('schedule')}
+                  disabled={isSubmitting}
+                >
+                  Schedule
+                </Button>
+              </Box>
+            </Flex>
           </FormGroup>
 
           <FormGroup>
@@ -440,90 +496,57 @@ export default function Discounts() {
           </FormGroup>
 
           <FormGroup>
-            <Box marginBottom="xxSmall" style={{ fontWeight: 'bold' }}>Discount Type</Box>
             <Flex alignItems="center">
-              <label style={{ display: 'flex', alignItems: 'center', marginRight: 16 }}>
-                <input
-                  type="radio"
-                  name="discountType"
-                  value="percent"
-                  checked={discountType === 'percent'}
-                  onChange={() => setDiscountType('percent')}
+              <Box marginRight="medium" style={{ fontWeight: 'bold' }}>Discount Type</Box>
+              <Box marginRight="small">
+                <Button
+                  variant={discountType === 'percent' ? "primary" : "secondary"}
+                  onClick={() => setDiscountType('percent')}
                   disabled={isSubmitting}
-                  style={{ marginRight: 8 }}
-                />
-                %
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center' }}>
-                <input
-                  type="radio"
-                  name="discountType"
-                  value="fixed"
-                  checked={discountType === 'fixed'}
-                  onChange={() => setDiscountType('fixed')}
+                >
+                  Percentage (%)
+                </Button>
+              </Box>
+              <Box>
+                <Button
+                  variant={discountType === 'fixed' ? "primary" : "secondary"}
+                  onClick={() => setDiscountType('fixed')}
                   disabled={isSubmitting}
-                  style={{ marginRight: 8 }}
-                />
-                $
-              </label>
+                >
+                  Fixed Amount ($)
+                </Button>
+              </Box>
             </Flex>
           </FormGroup>
 
-          <FormGroup>
-            <Input
-              label="Discount Amount"
-              name="amount"
-              placeholder={discountType === 'percent' ? '%' : '$'}
-              type="number"
-              step="0.01"
-              min={discountType === 'percent' ? 0 : undefined}
-              max={discountType === 'percent' ? 100 : undefined}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              onWheel={(e) => {
-                e.preventDefault();
-                e.currentTarget.blur();
-              }}
-              disabled={isSubmitting}
-              required
-              style={{
-                MozAppearance: 'textfield',
-                WebkitAppearance: 'none',
-                margin: 0
-              }}
-            />
-          </FormGroup>
+          {discountType && (
+            <FormGroup>
+              <Input
+                label="Discount Amount"
+                name="amount"
+                placeholder={discountType === 'percent' ? '%' : '$'}
+                type="number"
+                step="0.01"
+                min={discountType === 'percent' ? 0 : undefined}
+                max={discountType === 'percent' ? 100 : undefined}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                onWheel={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }}
+                disabled={isSubmitting}
+                required
+                style={{
+                  MozAppearance: 'textfield',
+                  WebkitAppearance: 'none',
+                  margin: 0
+                }}
+              />
+            </FormGroup>
+          )}
 
-          <FormGroup>
-            <Flex alignItems="center">
-              <label style={{ display: 'flex', alignItems: 'center', marginRight: 16 }}>
-                <input
-                  type="radio"
-                  name="applyTiming"
-                  value="immediate"
-                  checked={applyImmediately}
-                  onChange={() => setApplyImmediately(true)}
-                  disabled={isSubmitting}
-                  style={{ marginRight: 8 }}
-                />
-                Apply Immediately
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center' }}>
-                <input
-                  type="radio"
-                  name="applyTiming"
-                  value="scheduled"
-                  checked={!applyImmediately}
-                  onChange={() => setApplyImmediately(false)}
-                  disabled={isSubmitting}
-                  style={{ marginRight: 8 }}
-                />
-                Schedule for Later
-              </label>
-            </Flex>
-          </FormGroup>
-
-          {!applyImmediately && (
+          {applyMode === 'schedule' && (
             <FormGroup>
               <Input
                 label="Schedule Time"
@@ -572,6 +595,20 @@ export default function Discounts() {
             </FormGroup>
           </Flex>
           */}
+        </Flex>
+
+        <Flex marginTop="large" justifyContent="flex-end">
+          <Button 
+            variant="primary" 
+            onClick={handleSave}
+            disabled={isSubmitting}
+            isLoading={isSubmitting}
+          >
+            {isSubmitting 
+              ? (applyMode === 'create' ? 'Creating...' : applyMode === 'apply' ? 'Applying...' : 'Scheduling...') 
+              : (applyMode === 'create' ? 'Create Discount' : applyMode === 'apply' ? 'Apply Discount' : 'Schedule Discount')
+            }
+          </Button>
         </Flex>
       </Panel>
     </Box>
