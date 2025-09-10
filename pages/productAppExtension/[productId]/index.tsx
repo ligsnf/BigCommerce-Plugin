@@ -202,17 +202,26 @@ const ProductAppExtension = () => {
           const variantMetafieldsPromises = variants.map(async (variant) => {
             const cacheKey = `variant:metafields:${productId}:${variant.id}:${context}`;
             const cached = (() => {
-              try { return JSON.parse(localStorage.getItem(cacheKey) || 'null'); } catch { return null; }
+              try { 
+                
+                return JSON.parse(localStorage.getItem(cacheKey) || 'null'); } catch { return null; }
             })();
             if (cached && cached.expiresAt > Date.now()) {
+
               return cached.value;
             }
             const res = await fetch(`/api/productAppExtension/${productId}/variants/${variant.id}/metafields?context=${encodeURIComponent(context)}`);
             if (!res.ok) {
+
               return null;
             }
             const json = await res.json();
-            try { localStorage.setItem(cacheKey, JSON.stringify({ value: json, expiresAt: Date.now() + 120000 })); } catch {}
+            try { 
+              localStorage.setItem(cacheKey, JSON.stringify({ value: json, expiresAt: Date.now() + 120000 })); 
+            } catch {
+              // Ignore localStorage errors
+            }
+
             return json;
           });
 
@@ -295,7 +304,11 @@ const ProductAppExtension = () => {
             const response = await fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`);
             ok = response.ok;
             data = await response.json();
-            try { localStorage.setItem(cacheKey, JSON.stringify({ value: data, expiresAt: Date.now() + 120000 })); } catch {}
+            try { 
+              localStorage.setItem(cacheKey, JSON.stringify({ value: data, expiresAt: Date.now() + 120000 })); 
+            } catch {
+              // Ignore localStorage errors
+            }
           }
 
           if (ok) {

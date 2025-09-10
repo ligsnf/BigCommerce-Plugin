@@ -35,8 +35,6 @@ const BundlesListPage = () => {
         throw new Error(data?.message || 'Cleanup failed');
       }
       alert('Cleanup complete. Check console for details.');
-      // eslint-disable-next-line no-console
-      console.log('[Cleanup results]', data);
     } catch (e: any) {
       alert(`Cleanup error: ${e?.message || e}`);
     } finally {

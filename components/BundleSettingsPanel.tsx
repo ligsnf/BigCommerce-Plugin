@@ -90,9 +90,11 @@ const BundleSettingsPanel = ({
 
   const calculateMainBundlePrice = () => {
     if (!isBundle) return 0;
+
     return (linkedProducts || []).reduce((sum: number, p: any) => {
       const key = p.variantId ? `${p.productId ?? p.value}-${p.variantId}` : (p.value ?? '').toString();
       const qty = (productQuantities?.[key] ?? 1) as number;
+
       return sum + getUnitPrice(p) * Math.max(1, Number(qty) || 1);
     }, 0);
   };
@@ -101,9 +103,11 @@ const BundleSettingsPanel = ({
     if (!isBundle || !selectedVariant) return 0;
     const items = variantLinkedProducts?.[selectedVariant.id] || [];
     const quantities = variantProductQuantities?.[selectedVariant.id] || {};
+
     return items.reduce((sum: number, p: any) => {
       const key = p.variantId ? `${p.productId ?? p.value}-${p.variantId}` : (p.value ?? '').toString();
       const qty = (quantities?.[key] ?? 1) as number;
+      
       return sum + getUnitPrice(p) * Math.max(1, Number(qty) || 1);
     }, 0);
   };

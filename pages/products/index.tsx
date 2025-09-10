@@ -19,6 +19,7 @@ const Products = () => {
     const storeHash = context ? JSON.parse(atob(context.split('.')[1])).context : null;
 
     useEffect(() => {
+        // Effect for context and storeHash changes
     }, [context, storeHash]);
 
     const { error, isLoading, list = [], meta = {} } = useProductList({
