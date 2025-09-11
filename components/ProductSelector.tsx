@@ -69,6 +69,7 @@ const ProductSelector = ({
         isSearchable
         options={filteredOptions}
         value={selectedItem}
+        closeMenuOnSelect={false}
         onChange={(option) => {
           onItemSelect(option);
         }}
