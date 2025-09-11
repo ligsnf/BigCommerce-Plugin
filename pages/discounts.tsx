@@ -1,6 +1,6 @@
 import { Badge, Box, Button, Dropdown, Flex, FormGroup, H1, Input, MultiSelect, Panel, Table } from '@bigcommerce/big-design';
 import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSession } from '../context/session';
 
 type DiscountType = 'percent' | 'fixed';
@@ -25,7 +25,7 @@ export default function Discounts() {
   const [discountsLoading, setDiscountsLoading] = useState(false);
   const [discountsError, setDiscountsError] = useState<string | null>(null);
 
-  const checkAndActivateScheduledDiscounts = async () => {
+  const checkAndActivateScheduledDiscounts = useCallback(async () => {
     if (!context) {
       console.log('No context available, skipping scheduled discount check');
       
@@ -45,9 +45,9 @@ return;
     } catch (err) {
       console.error('Error checking scheduled discounts:', err);
     }
-  };
+  }, [context]);
 
-  const loadDiscounts = async () => {
+  const loadDiscounts = useCallback(async () => {
     try {
       console.log('Loading discounts with context:', context);
       setDiscountsLoading(true);
@@ -67,11 +67,11 @@ return;
     } finally {
       setDiscountsLoading(false);
     }
-  };
+  }, [context, checkAndActivateScheduledDiscounts]);
 
   useEffect(() => {
     if (context) loadDiscounts();
-  }, [context]);
+  }, [loadDiscounts, context]);
 
   // Check for scheduled discounts every minute
   useEffect(() => {
@@ -90,7 +90,7 @@ return;
       clearTimeout(initialTimeout);
       clearInterval(interval);
     };
-  }, [context]);
+  }, [context, checkAndActivateScheduledDiscounts]);
 
   const [categoryOptions, setCategoryOptions] = useState<{ value: string; content: string }[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);

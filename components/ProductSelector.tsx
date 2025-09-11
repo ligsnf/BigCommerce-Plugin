@@ -70,13 +70,6 @@ const ProductSelector = ({
         options={filteredOptions}
         value={selectedItem}
         onChange={(option) => {
-          // eslint-disable-next-line no-console
-          console.log('Selected option:', {
-            label: option?.label,
-            productId: option?.productId,
-            variantId: option?.variantId,
-            inventory_tracking: option?.inventory_tracking
-          });
           onItemSelect(option);
         }}
         placeholder="Search and select a product or SKU..."

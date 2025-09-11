@@ -387,35 +387,33 @@ const ProductAppExtension = () => {
     setIsBundle(prev => !prev);
   };
 
-  // Helper to get SKUs from linked products
-  const getSkusFromLinkedProducts = async (linkedProducts: any[]) => {
+  // Helper to get SKUs from linked products using pre-fetched data
+  const getSkusFromLinkedProducts = (linkedProducts: any[], productDataMap: Map<string, any>, variantDataMap: Map<string, any>) => {
     const skus: string[] = [];
     
     for (const p of linkedProducts) {
       const compProductId = p.productId || p.value;
-      try {
-        const res = await fetch(`/api/products/${compProductId}?context=${encodeURIComponent(context)}`);
-        if (res.ok) {
-          const data = await res.json();
-          
-          if (data.variants && data.variants.length > 0 && p.variantId) {
-            // Get variant SKU
-            const variantRes = await fetch(`/api/products/${compProductId}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
-            if (variantRes.ok) {
-              const variantData = await variantRes.json();
-              if (variantData.sku) {
-                skus.push(variantData.sku);
-              }
-            }
-          } else {
-            // Get product SKU
-            if (data.sku) {
-              skus.push(data.sku);
-            }
-          }
+      const productKey = compProductId.toString();
+      
+      // Get product data from pre-fetched map
+      const productData = productDataMap.get(productKey);
+      if (!productData) {
+        console.warn(`Product data not found for ${compProductId}`);
+        continue;
+      }
+      
+      if (productData.variants && productData.variants.length > 0 && p.variantId) {
+        // Get variant SKU from pre-fetched variant data
+        const variantKey = `${compProductId}-${p.variantId}`;
+        const variantData = variantDataMap.get(variantKey);
+        if (variantData && variantData.sku) {
+          skus.push(variantData.sku);
         }
-      } catch (error) {
-        console.error(`Error fetching SKU for product ${compProductId}:`, error);
+      } else {
+        // Get product SKU from pre-fetched product data
+        if (productData.sku) {
+          skus.push(productData.sku);
+        }
       }
     }
     
@@ -510,39 +508,58 @@ const ProductAppExtension = () => {
 
           if (variantHasBundle) {
             // Calculate variant stock and weight based on linked products
-            const components = await Promise.all(
-              currentVariantProducts.map(async (p) => {
-                const compProductId = p.productId || p.value;
-                const res = await fetch(`/api/products/${compProductId}?context=${encodeURIComponent(context)}`);
-                if (!res.ok) {
-                  return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
-                }
-                const data = await res.json();
+            const productDataMap = new Map();
+            const variantDataMap = new Map();
 
-                const key = p.variantId ? `${p.productId}-${p.variantId}` : p.value.toString();
-                const qty = variantProductQuantities[variant.id]?.[key] || 1;
-
-                if (data.variants && data.variants.length > 0 && p.variantId) {
-                  const variantRes = await fetch(`/api/products/${compProductId}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
-                  if (!variantRes.ok) {
-                    return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
+            // Step 1: Batch fetch all products once
+            const productIds = Array.from(new Set(currentVariantProducts.map(p => (p.productId || p.value))));
+            if (productIds.length > 0) {
+              const batchRes = await fetch(`/api/products/batch?ids=${productIds.join(',')}&context=${encodeURIComponent(context)}`);
+              if (batchRes.ok) {
+                const batchProducts = await batchRes.json();
+                (batchProducts || []).forEach((prod: any) => {
+                  productDataMap.set(String(prod.id), prod);
+                  if (Array.isArray(prod.variants)) {
+                    prod.variants.forEach((v: any) => {
+                      variantDataMap.set(`${prod.id}-${v.id}`, v);
+                    });
                   }
-                  const variantData = await variantRes.json();
+                });
+              }
+            }
 
-                  return {
-                    availableUnits: Math.floor((variantData.inventory_level ?? 0) / qty),
-                    weightContribution: (variantData.weight ?? 0) * qty,
-                    priceContribution: (variantData.price ?? 0) * qty,
-                  };
+            // Step 2: Calculate components using batched data
+            const components = currentVariantProducts.map((p) => {
+              const compProductId = p.productId || p.value;
+              const data = productDataMap.get(compProductId.toString());
+              
+              if (!data) {
+                return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
+              }
+
+              const key = p.variantId ? `${p.productId}-${p.variantId}` : p.value.toString();
+              const qty = variantProductQuantities[variant.id]?.[key] || 1;
+
+              if (data.variants && data.variants.length > 0 && p.variantId) {
+                const variantData = variantDataMap.get(`${compProductId}-${p.variantId}`);
+                
+                if (!variantData) {
+                  return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
                 }
 
                 return {
-                  availableUnits: Math.floor((data.inventory_level ?? 0) / qty),
-                  weightContribution: (data.weight ?? 0) * qty,
-                  priceContribution: (data.price ?? 0) * qty,
+                  availableUnits: Math.floor((variantData.inventory_level ?? 0) / qty),
+                  weightContribution: (variantData.weight ?? 0) * qty,
+                  priceContribution: (variantData.price ?? 0) * qty,
                 };
-              })
-            );
+              }
+
+              return {
+                availableUnits: Math.floor((data.inventory_level ?? 0) / qty),
+                weightContribution: (data.weight ?? 0) * qty,
+                priceContribution: (data.price ?? 0) * qty,
+              };
+            });
 
             const minStock = Math.min(...components.map(c => c.availableUnits));
             const totalWeight = components.reduce((sum, c) => sum + c.weightContribution, 0);
@@ -554,8 +571,8 @@ const ProductAppExtension = () => {
             if (firstBundleVariantWeight == null) {
               firstBundleVariantWeight = totalWeight;
             }
-            // Get SKUs from linked products for this variant bundle
-            const variantSkus = await getSkusFromLinkedProducts(currentVariantProducts);
+            // Get SKUs from linked products for this variant bundle using pre-fetched data
+            const variantSkus = getSkusFromLinkedProducts(currentVariantProducts, productDataMap, variantDataMap);
             const newVariantSku = variantSkus.length > 0 ? variantSkus.join(' & ') : variant.sku;
 
             updatePromises.push(
@@ -669,54 +686,73 @@ const ProductAppExtension = () => {
         const updateData: any = {};
 
         if (isActuallyBundle) {
-          const components = await Promise.all(
-            linkedProducts.map(async (p) => {
-              // Use productId for fetching the product, not the variant ID
-              const compProductId = p.productId || p.value;
-              const res = await fetch(`/api/products/${compProductId}?context=${encodeURIComponent(context)}`);
-              if (!res.ok) {
+          const productDataMap = new Map();
+          const variantDataMap = new Map();
+
+          // Step 1: Batch fetch all products once
+          const productIds = Array.from(new Set(linkedProducts.map(p => (p.productId || p.value))));
+          if (productIds.length > 0) {
+            const batchRes = await fetch(`/api/products/batch?ids=${productIds.join(',')}&context=${encodeURIComponent(context)}`);
+            if (batchRes.ok) {
+              const batchProducts = await batchRes.json();
+              (batchProducts || []).forEach((prod: any) => {
+                productDataMap.set(String(prod.id), prod);
+                if (Array.isArray(prod.variants)) {
+                  prod.variants.forEach((v: any) => {
+                    variantDataMap.set(`${prod.id}-${v.id}`, v);
+                  });
+                }
+              });
+            }
+          }
+
+          // Step 2: Calculate components using batched data
+          const components = linkedProducts.map((p) => {
+            const compProductId = p.productId || p.value;
+            const data = productDataMap.get(compProductId.toString());
+            
+            if (!data) {
+              return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
+            }
+
+            if (data.variants && data.variants.length > 0 && p.variantId) {
+              const variantData = variantDataMap.get(`${compProductId}-${p.variantId}`);
+              
+              if (!variantData) {
                 return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
               }
-              const data = await res.json();
-
-              if (data.variants && data.variants.length > 0 && p.variantId) {
-                const variantRes = await fetch(`/api/products/${compProductId}/variants/${p.variantId}?context=${encodeURIComponent(context)}`);
-                if (!variantRes.ok) {
-                  return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
-                }
-                const variantData = await variantRes.json();
-                const key = `${compProductId}-${p.variantId}`;
-                const qty = productQuantities[key] || 1;
-
-                // Use variant's weight/price, but fall back to product's if variant fields are null/undefined
-                const unitWeight = (variantData.weight != null ? variantData.weight : (data.weight ?? 0));
-                const unitPrice = (variantData.price != null ? variantData.price : (data.price ?? 0));
-
-                return {
-                  availableUnits: Math.floor((variantData.inventory_level ?? 0) / qty),
-                  weightContribution: unitWeight * qty,
-                  priceContribution: unitPrice * qty,
-                };
-              }
-
-              const key = p.variantId ? `${compProductId}-${p.variantId}` : compProductId.toString();
+              
+              const key = `${compProductId}-${p.variantId}`;
               const qty = productQuantities[key] || 1;
 
+              // Use variant's weight/price, but fall back to product's if variant fields are null/undefined
+              const unitWeight = (variantData.weight != null ? variantData.weight : (data.weight ?? 0));
+              const unitPrice = (variantData.price != null ? variantData.price : (data.price ?? 0));
+
               return {
-                availableUnits: Math.floor((data.inventory_level ?? 0) / qty),
-                weightContribution: (data.weight ?? 0) * qty,
-                priceContribution: (data.price ?? 0) * qty,
+                availableUnits: Math.floor((variantData.inventory_level ?? 0) / qty),
+                weightContribution: unitWeight * qty,
+                priceContribution: unitPrice * qty,
               };
-            })
-          );
+            }
+
+            const key = p.variantId ? `${compProductId}-${p.variantId}` : compProductId.toString();
+            const qty = productQuantities[key] || 1;
+
+            return {
+              availableUnits: Math.floor((data.inventory_level ?? 0) / qty),
+              weightContribution: (data.weight ?? 0) * qty,
+              priceContribution: (data.price ?? 0) * qty,
+            };
+          });
 
           const minStock = Math.min(...components.map(c => c.availableUnits));
           const totalWeight = components.reduce((sum, c) => sum + c.weightContribution, 0);
           const calculatedPrice = components.reduce((sum, c) => sum + c.priceContribution, 0);
           const finalPrice = overridePrice != null ? overridePrice : calculatedPrice;
           
-          // Get SKUs from linked products for this non-variant bundle
-          const bundleSkus = await getSkusFromLinkedProducts(linkedProducts);
+          // Get SKUs from linked products for this non-variant bundle using pre-fetched data
+          const bundleSkus = getSkusFromLinkedProducts(linkedProducts, productDataMap, variantDataMap);
           const newBundleSku = bundleSkus.length > 0 ? bundleSkus.join(' & ') : product?.sku;
           
           updateData.inventory_level = minStock;
@@ -789,24 +825,6 @@ const ProductAppExtension = () => {
         });
       }
 
-      // Full refresh shortly after showing the success message
-      setTimeout(() => {
-        if (typeof window !== 'undefined') {
-          try {
-            // If embedded in an iframe (e.g., BigCommerce panel), try to reload the top-level page
-            if (window.top && window.top !== window) {
-              window.top.location.reload();
-
-              return;
-            }
-          } catch (e) {
-            // Ignore cross-origin access errors and fall back to reloading this window
-          }
-
-          // Fallback: reload current window
-          window.location.reload();
-        }
-      }, 1200);
     } catch (err) {
       alertsManager.add({
         messages: [{ text: 'Failed to save changes.' }],
