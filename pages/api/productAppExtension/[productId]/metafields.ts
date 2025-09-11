@@ -49,6 +49,7 @@ return res.status(200).json(hit);
       const isBundle = data.find(f => f.key === 'is_bundle')?.value === 'true';
       const linkedIdsRaw = data.find(f => f.key === 'linked_product_ids')?.value;
       const overridePriceRaw = data.find(f => f.key === 'override_price')?.value;
+      const originalSkuRaw = data.find(f => f.key === 'original_sku')?.value;
       let linkedProductIds = linkedIdsRaw ? JSON.parse(linkedIdsRaw) : [];
       // Normalize: always return array of { productId, variantId, quantity }
       linkedProductIds = linkedProductIds.map(item => {
@@ -67,8 +68,9 @@ return res.status(200).json(hit);
         }
       });
       const overridePrice = overridePriceRaw != null ? parseFloat(overridePriceRaw) : null;
+      const originalSku = originalSkuRaw != null ? String(originalSkuRaw) : null;
 
-      const payload = { isBundle, linkedProductIds, overridePrice };
+      const payload = { isBundle, linkedProductIds, overridePrice, originalSku };
       setCache(cacheKey, payload, 60_000);
       res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=120');
       
@@ -83,7 +85,7 @@ return res.status(200).json(payload);
   // POST: Save or update metafields
   if (req.method === 'POST') {
     try {
-      const { isBundle, linkedProductIds, overridePrice } = req.body;
+      const { isBundle, linkedProductIds, overridePrice, originalSku } = req.body;
 
       if (typeof isBundle !== 'boolean') {
         return res.status(400).json({ message: 'Missing or invalid isBundle' });
@@ -143,6 +145,14 @@ return res.status(200).json(payload);
           namespace: 'bundle',
           permission_set: 'app_only',
           description: 'Optional manual price override for the bundle',
+        }] : []),
+        // Optional original SKU metafield (persist the pre-bundle SKU so we can restore later)
+        ...(originalSku != null && originalSku !== '' ? [{
+          key: 'original_sku',
+          value: String(originalSku),
+          namespace: 'bundle',
+          permission_set: 'app_only',
+          description: 'Original SKU before bundle status',
         }] : [])
       ];
 

@@ -160,10 +160,45 @@ const ProductAppExtension = () => {
     };
 
     if (selectedVariant) {
+      // Check if adding this product would create a duplicate SKU across variants
+      const newVariantProducts = [...(variantLinkedProducts[selectedVariant.id] || []), newProduct];
+      
+      // Calculate what the SKU would be for this variant
+      const currentSkus = newVariantProducts.map(p => p.skuLabel || p.sku).filter(Boolean);
+      const newVariantSku = currentSkus.length > 0 ? currentSkus.join(' & ') : selectedVariant.sku;
+      
+      // Check if any other variant would have the same SKU
+      let wouldCreateDuplicate = false;
+      for (const variant of variants) {
+        if (variant.id !== selectedVariant.id) {
+          const otherVariantProducts = variantLinkedProducts[variant.id] || [];
+          if (otherVariantProducts.length > 0) {
+            const otherSkus = otherVariantProducts.map(p => p.skuLabel || p.sku).filter(Boolean);
+            const otherVariantSku = otherSkus.length > 0 ? otherSkus.join(' & ') : variant.sku;
+            
+            if (otherVariantSku === newVariantSku) {
+              wouldCreateDuplicate = true;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (wouldCreateDuplicate) {
+        alertsManager.add({
+          messages: [{ text: `Cannot add this product: It would create a duplicate SKU "${newVariantSku}" with another variant. Each variant must have unique product combinations.` }],
+          type: 'error',
+          onClose: () => null,
+        });
+        setSelectedItem(null);
+        
+return;
+      }
+      
       // Add to variant bundle
       setVariantLinkedProducts(prev => ({
         ...prev,
-        [selectedVariant.id]: [...(prev[selectedVariant.id] || []), newProduct]
+        [selectedVariant.id]: newVariantProducts
       }));
       setVariantProductQuantities(prev => ({
         ...prev,
@@ -434,12 +469,15 @@ const ProductAppExtension = () => {
     }));
   };
 
-  const handleVariantQuantityChange = (variantId, productId, quantity) => {
+  const handleVariantQuantityChange = (variantId, productId, linkedProductVariantId, quantity) => {
+    const key = linkedProductVariantId ? `${productId}-${linkedProductVariantId}` : productId.toString();
+    const newQuantity = Math.max(1, parseInt(quantity) || 1);
+    
     setVariantProductQuantities(prev => ({
       ...prev,
       [variantId]: {
         ...(prev[variantId] || {}),
-        [`${productId}-${variantId}`]: Math.max(1, parseInt(quantity) || 1)
+        [key]: newQuantity
       }
     }));
   };
@@ -466,6 +504,59 @@ const ProductAppExtension = () => {
           : linkedProducts.length > 0
       );
 
+      // Validate for duplicate SKUs across variants
+      if (hasMultipleVariants && isActuallyBundle) {
+        const variantSkus = new Map();
+        const duplicateSkus = new Set();
+        
+        for (const variant of variants) {
+          const currentVariantProducts = variantLinkedProducts[variant.id] || [];
+          if (isBundle && currentVariantProducts.length > 0) {
+            // Get SKUs for this variant bundle
+            const productDataMap = new Map();
+            const variantDataMap = new Map();
+
+            const productIds = Array.from(new Set(currentVariantProducts.map(p => (p.productId || p.value))));
+            if (productIds.length > 0) {
+              const batchRes = await fetch(`/api/products/batch?ids=${productIds.join(',')}&context=${encodeURIComponent(context)}`);
+              if (batchRes.ok) {
+                const batchProducts = await batchRes.json();
+                (batchProducts || []).forEach((prod: any) => {
+                  productDataMap.set(String(prod.id), prod);
+                  if (Array.isArray(prod.variants)) {
+                    prod.variants.forEach((v: any) => {
+                      variantDataMap.set(`${prod.id}-${v.id}`, v);
+                    });
+                  }
+                });
+              }
+            }
+
+            const skus = getSkusFromLinkedProducts(currentVariantProducts, productDataMap, variantDataMap);
+            const variantSku = skus.length > 0 ? skus.join(' & ') : variant.sku;
+            
+            if (variantSkus.has(variantSku)) {
+              duplicateSkus.add(variantSku);
+            } else {
+              variantSkus.set(variantSku, variant.id);
+            }
+          }
+        }
+        
+        if (duplicateSkus.size > 0) {
+          alertsManager.add({
+            messages: [{ 
+              text: `Cannot save bundle: The following SKUs would be duplicated across variants: ${Array.from(duplicateSkus).join(', ')}. Please ensure each variant has unique product combinations.` 
+            }],
+            type: 'error',
+            onClose: () => null,
+          });
+          setSaving(false);
+          
+return;
+        }
+      }
+
       // Update product and variant SKUs
       const updatePromises = [];
 
@@ -485,11 +576,12 @@ const ProductAppExtension = () => {
             linkedProductIds: variantHasBundle ? currentVariantProducts.map((p) => {
               const productId = p.productId || p.value;
               const key = p.variantId ? `${productId}-${p.variantId}` : productId.toString();
+              const quantity = variantProductQuantities[variant.id]?.[key] || 1;
 
               return {
                 productId: productId,
                 variantId: p.variantId || null,
-                quantity: variantProductQuantities[variant.id]?.[key] || 1
+                quantity: quantity
               };
             }) : []
           };
@@ -502,6 +594,8 @@ const ProductAppExtension = () => {
               body: JSON.stringify({
                 ...variantMetafieldsData,
                 overridePrice: variantHasBundle ? (variantOverridePrices[variant.id] ?? null) : null,
+                // When enabling variant bundle for the first time, persist original SKU once
+                originalSku: variantHasBundle ? (variant?.sku || null) : null,
               }),
             })
           );
@@ -537,7 +631,8 @@ const ProductAppExtension = () => {
                 return { availableUnits: 0, weightContribution: 0, priceContribution: 0 };
               }
 
-              const key = p.variantId ? `${p.productId}-${p.variantId}` : p.value.toString();
+              const productId = p.productId || p.value;
+              const key = p.variantId ? `${productId}-${p.variantId}` : productId.toString();
               const qty = variantProductQuantities[variant.id]?.[key] || 1;
 
               if (data.variants && data.variants.length > 0 && p.variantId) {
@@ -575,20 +670,45 @@ const ProductAppExtension = () => {
             const variantSkus = getSkusFromLinkedProducts(currentVariantProducts, productDataMap, variantDataMap);
             const newVariantSku = variantSkus.length > 0 ? variantSkus.join(' & ') : variant.sku;
 
+            const variantUpdateData = {
+              inventory_level: minStock,
+              weight: totalWeight,
+              price: finalPrice,
+              sku: newVariantSku,
+            };
+
             updatePromises.push(
               fetch(`/api/products/${productId}/variants/${variant.id}?context=${encodeURIComponent(context)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  inventory_level: minStock,
-                  weight: totalWeight,
-                  price: finalPrice,
-                  sku: newVariantSku,
-                }),
+                body: JSON.stringify(variantUpdateData),
               })
             );
           }
         }
+        // If no variants are bundles anymore, restore variant SKUs from saved original_sku metafields
+        if (!anyVariantIsBundle) {
+          for (const v of variants) {
+            try {
+              const mfRes = await fetch(`/api/productAppExtension/${productId}/variants/${v.id}/metafields?context=${encodeURIComponent(context)}`);
+              if (mfRes.ok) {
+                const mf = await mfRes.json();
+                if (mf?.originalSku) {
+                  updatePromises.push(
+                    fetch(`/api/products/${productId}/variants/${v.id}?context=${encodeURIComponent(context)}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ sku: mf.originalSku }),
+                    })
+                  );
+                }
+              }
+            } catch (e) {
+              // Ignore errors when restoring original SKU from metafields
+            }
+          }
+        }
+
         // Update main product SKU (add/remove BUN- prefix) when product has variants
         const currentProductSku = product?.sku || '';
         const hasBunPrefixOnProduct = currentProductSku.startsWith('BUN-');
@@ -596,16 +716,46 @@ const ProductAppExtension = () => {
 
         if (anyVariantIsBundle && !hasBunPrefixOnProduct) {
           newProductSku = `BUN-${currentProductSku}`;
-        } else if (!anyVariantIsBundle && hasBunPrefixOnProduct) {
-          newProductSku = currentProductSku.replace('BUN-', '');
+        } else if (!anyVariantIsBundle) {
+          // Prefer restoring from saved original_sku if available
+          try {
+            const mfRes = await fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`);
+            if (mfRes.ok) {
+              const mf = await mfRes.json();
+              if (mf?.originalSku) {
+                newProductSku = mf.originalSku;
+              } else if (hasBunPrefixOnProduct) {
+                newProductSku = currentProductSku.replace('BUN-', '');
+              }
+            } else if (hasBunPrefixOnProduct) {
+              newProductSku = currentProductSku.replace('BUN-', '');
+            }
+          } catch {
+            if (hasBunPrefixOnProduct) {
+              newProductSku = currentProductSku.replace('BUN-', '');
+            }
+          }
         }
 
         if (newProductSku !== currentProductSku) {
+          // If we're about to add BUN- for the first time, persist original product SKU
+          const body: any = { sku: newProductSku };
+          if (anyVariantIsBundle && !hasBunPrefixOnProduct && currentProductSku) {
+            try {
+              await fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isBundle: true, linkedProductIds: [], overridePrice: null, originalSku: currentProductSku }),
+              });
+            } catch (e) {
+              // Ignore errors when persisting original SKU
+            }
+          }
           updatePromises.push(
             fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sku: newProductSku }),
+              body: JSON.stringify(body),
             })
           );
         }
@@ -673,6 +823,21 @@ const ProductAppExtension = () => {
         } as any;
 
         metafieldsData.overridePrice = isActuallyBundle ? (overridePrice ?? null) : null;
+
+        // If we're enabling bundle on a single-variant product, persist original SKU so we can restore later
+        if (isActuallyBundle) {
+          try {
+            const currentProdRes = await fetch(`/api/products/${productId}?context=${encodeURIComponent(context)}`);
+            if (currentProdRes.ok) {
+              const currentProd = await currentProdRes.json();
+              if (currentProd?.sku) {
+                (metafieldsData as any).originalSku = currentProd.sku;
+              }
+            }
+          } catch (e) {
+            // Ignore errors when persisting original SKU
+          }
+        }
 
 
         updatePromises.push(
@@ -797,6 +962,40 @@ const ProductAppExtension = () => {
             }
           } catch (e) {
             // Failed to remove Bundle category for non-bundle product
+          }
+          // For products with variants, also restore variant SKUs from their saved original_sku
+          try {
+            if (variants.length > 1) {
+              for (const v of variants) {
+                const mfRes = await fetch(`/api/productAppExtension/${productId}/variants/${v.id}/metafields?context=${encodeURIComponent(context)}`);
+                if (mfRes.ok) {
+                  const mf = await mfRes.json();
+                  if (mf?.originalSku) {
+                    updatePromises.push(
+                      fetch(`/api/products/${productId}/variants/${v.id}?context=${encodeURIComponent(context)}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sku: mf.originalSku }),
+                      })
+                    );
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // Ignore errors when restoring variant SKUs
+          }
+          // Restore original SKU if we have one saved in metafields
+          try {
+            const mfRes = await fetch(`/api/productAppExtension/${productId}/metafields?context=${encodeURIComponent(context)}`);
+            if (mfRes.ok) {
+              const mf = await mfRes.json();
+              if (mf?.originalSku) {
+                updateData.sku = mf.originalSku;
+              }
+            }
+          } catch (e) {
+            // Ignore errors when restoring original product SKU
           }
         }
 

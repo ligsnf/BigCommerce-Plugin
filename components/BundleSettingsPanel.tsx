@@ -22,7 +22,7 @@ interface BundleSettingsPanelProps {
   onVariantSelect: (variant: any) => void;
   variantLinkedProducts: Record<number, any[]>;
   variantProductQuantities: Record<number, Record<number, number>>;
-  onVariantQuantityChange: (variantId: number, productId: number, quantity: number) => void;
+  onVariantQuantityChange: (variantId: number, productId: number, linkedProductVariantId: number | null, quantity: number) => void;
   onVariantRemoveProduct: (variantId: number, productId: number) => void;
   overridePrice: number | null;
   onOverridePriceChange: (value: number | null) => void;
@@ -167,7 +167,7 @@ const BundleSettingsPanel = ({
                   <BundleItemsTable
                     linkedProducts={variantLinkedProducts[selectedVariant.id] || []}
                     productQuantities={variantProductQuantities[selectedVariant.id] || {}}
-                    onQuantityChange={(productId, quantity) => onVariantQuantityChange(selectedVariant.id, productId, quantity)}
+                    onQuantityChange={(productId, quantity, linkedProductVariantId) => onVariantQuantityChange(selectedVariant.id, productId, linkedProductVariantId, quantity)}
                     onRemoveProduct={(productId) => onVariantRemoveProduct(selectedVariant.id, productId)}
                   />
 
@@ -205,7 +205,7 @@ const BundleSettingsPanel = ({
           <BundleItemsTable
             linkedProducts={linkedProducts}
             productQuantities={productQuantities}
-            onQuantityChange={onQuantityChange}
+            onQuantityChange={(productId, quantity) => onQuantityChange(productId, quantity)}
             onRemoveProduct={onRemoveProduct}
           />
 
