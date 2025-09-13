@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Dropdown, Flex, FormGroup, H1, Input, MultiSelect, Panel, Table } from '@bigcommerce/big-design';
+import { Alert, Badge, Box, Button, Dropdown, Flex, FormGroup, H1, Input, MultiSelect, Panel, Table } from '@bigcommerce/big-design';
 import { MoreHorizIcon } from '@bigcommerce/big-design-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useSession } from '../context/session';
@@ -6,9 +6,10 @@ import { useSession } from '../context/session';
 type DiscountType = 'percent' | 'fixed';
 
 interface DiscountRow {
-  id: number;
+  id: string; // Changed to string to handle the new format
   name: string;
   categories: string[];
+  categoryIds: number[]; // Added to track category IDs
   type: DiscountType;
   amount: number; // stores raw number; format per type in UI
   startDate?: string; // ISO strings for simplicity
@@ -16,6 +17,8 @@ interface DiscountRow {
   scheduledTime?: string; // ISO string for when discount should be activated
   endDateTime?: string; // ISO string for when discount should be deactivated
   status: 'Active' | 'Inactive' | 'Scheduled';
+  metafieldId?: number; // Added to track the metafield ID
+  categoryId?: number; // Added to track the category ID
 }
 
 export default function Discounts() {
@@ -24,6 +27,78 @@ export default function Discounts() {
   const [discounts, setDiscounts] = useState<DiscountRow[]>([]);
   const [discountsLoading, setDiscountsLoading] = useState(false);
   const [discountsError, setDiscountsError] = useState<string | null>(null);
+  const [scheduledReloads, setScheduledReloads] = useState<Set<string>>(new Set());
+  const [reloadNotification, setReloadNotification] = useState<string | null>(null);
+
+  // Function to schedule iframe reloads for specific discount times
+  const scheduleIframeReloads = useCallback((discountsData: DiscountRow[]) => {
+    if (typeof window === 'undefined') return;
+
+    // Clear existing scheduled reloads
+    setScheduledReloads(new Set());
+
+    discountsData.forEach((discount) => {
+      const reloadTimes: string[] = [];
+
+      // Schedule reload for scheduled start time
+      if (discount.scheduledTime && discount.status === 'Scheduled') {
+        reloadTimes.push(discount.scheduledTime);
+      }
+
+      // Schedule reload for end time
+      if (discount.endDateTime) {
+        reloadTimes.push(discount.endDateTime);
+      }
+
+      // Schedule reloads for each time
+      reloadTimes.forEach((timeStr) => {
+        const reloadKey = `${discount.id}-${timeStr}`;
+        
+        // Avoid duplicate scheduling
+        if (scheduledReloads.has(reloadKey)) return;
+
+        // Parse UTC time and compare with current time
+        const targetTime = new Date(timeStr); // timeStr is already UTC ISO string
+        const now = new Date();
+        const timeDiff = targetTime.getTime() - now.getTime();
+
+        // Only schedule if the time is in the future
+        if (timeDiff > 0) {
+          console.log(`Scheduling iframe reload for discount ${discount.name} at ${timeStr}`);
+          
+          setTimeout(() => {
+            console.log(`Reloading iframe for discount ${discount.name} at scheduled time`);
+            // Try multiple approaches to reload the iframe
+            if (window.parent !== window) {
+              try {
+                // Method 1: Try BigCommerce SDK if available
+                if (typeof (window as any).Bigcommerce !== 'undefined' && (window as any).Bigcommerce.reload) {
+                  (window as any).Bigcommerce.reload();
+                  
+return;
+                }
+                
+                // Method 2: Try postMessage
+                window.parent.postMessage({ type: 'RELOAD_IFRAME' }, '*');
+                
+                // Method 3: Show user notification instead of silent reload
+                setReloadNotification(`Discount "${discount.name}" has been ${discount.scheduledTime === timeStr ? 'activated' : 'deactivated'}. Please refresh the page to see updates.`);
+                
+              } catch (error) {
+                console.log('Could not reload iframe due to CORS restrictions');
+                // Fallback: show notification and reload current page
+                setReloadNotification(`Discount "${discount.name}" has been ${discount.scheduledTime === timeStr ? 'activated' : 'deactivated'}. Please refresh the page to see updates.`);
+                setTimeout(() => window.location.reload(), 2000);
+              }
+            }
+          }, timeDiff);
+
+          // Track this scheduled reload
+          setScheduledReloads(prev => new Set(Array.from(prev).concat(reloadKey)));
+        }
+      });
+    });
+  }, [scheduledReloads]);
 
   const checkAndActivateScheduledDiscounts = useCallback(async () => {
     if (!context) {
@@ -36,14 +111,51 @@ return;
       const res = await fetch(`/api/categories/discounts/activate-scheduled?context=${encodeURIComponent(context)}`, {
         method: 'POST',
       });
+      
       if (res.ok) {
         const result = await res.json();
         if (result.activatedCount > 0) {
           console.log(`Activated ${result.activatedCount} scheduled discounts`);
+          // Reload the iframe to show updated discount status
+          if (typeof window !== 'undefined' && window.parent !== window) {
+            try {
+              // Method 1: Try BigCommerce SDK if available
+              if (typeof (window as any).Bigcommerce !== 'undefined' && (window as any).Bigcommerce.reload) {
+                (window as any).Bigcommerce.reload();
+                
+return;
+              }
+              
+              // Method 2: Try postMessage
+              window.parent.postMessage({ type: 'RELOAD_IFRAME' }, '*');
+              
+              // Method 3: Show notification
+              setReloadNotification(`${result.activatedCount} scheduled discount(s) have been activated. Please refresh the page to see updates.`);
+              
+            } catch (error) {
+              console.log('Could not reload iframe due to CORS restrictions');
+              // Fallback: show notification and reload current page
+              setReloadNotification(`${result.activatedCount} scheduled discount(s) have been activated. Please refresh the page to see updates.`);
+              setTimeout(() => window.location.reload(), 2000);
+            }
+          }
+        }
+      } else {
+        // Handle API errors gracefully - don't log as error if it's a session issue
+        const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+        if (res.status === 400 && errorData.message?.includes('Context parameter')) {
+          console.log('Session not ready, skipping scheduled discount check');
+        } else {
+          console.error('Error checking scheduled discounts:', errorData.message);
         }
       }
     } catch (err) {
-      console.error('Error checking scheduled discounts:', err);
+      // Only log as error if it's not a network/session issue
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        console.log('Network error during scheduled discount check (session may not be ready)');
+      } else {
+        console.error('Error checking scheduled discounts:', err);
+      }
     }
   }, [context]);
 
@@ -53,21 +165,22 @@ return;
       setDiscountsLoading(true);
       setDiscountsError(null);
       
-      // First check and activate any scheduled discounts that are due
-      await checkAndActivateScheduledDiscounts();
-      
       const res = await fetch(`/api/categories/discounts?context=${encodeURIComponent(context)}`);
       if (!res.ok) throw new Error('Failed to load discounts');
       const json = await res.json();
       console.log('Loaded discounts:', json);
-      setDiscounts((json?.data || []) as DiscountRow[]);
+      const discountsData = (json?.data || []) as DiscountRow[];
+      setDiscounts(discountsData);
+      
+      // Schedule iframe reloads for scheduled discount times
+      scheduleIframeReloads(discountsData);
     } catch (err: any) {
       console.error('Error loading discounts:', err);
       setDiscountsError(err?.message || 'Unable to fetch discounts');
     } finally {
       setDiscountsLoading(false);
     }
-  }, [context, checkAndActivateScheduledDiscounts]);
+  }, [context, scheduleIframeReloads]);
 
   useEffect(() => {
     if (context) loadDiscounts();
@@ -77,10 +190,10 @@ return;
   useEffect(() => {
     if (!context) return;
 
-    // Initial check after a short delay to ensure context is fully loaded
+    // Initial check after a longer delay to ensure session is fully established
     const initialTimeout = setTimeout(() => {
       checkAndActivateScheduledDiscounts();
-    }, 1000);
+    }, 3000); // Increased delay to 3 seconds
 
     const interval = setInterval(() => {
       checkAndActivateScheduledDiscounts();
@@ -91,6 +204,14 @@ return;
       clearInterval(interval);
     };
   }, [context, checkAndActivateScheduledDiscounts]);
+
+  // Cleanup scheduled reloads on unmount
+  useEffect(() => {
+    return () => {
+      // Clear any pending reload notifications
+      setReloadNotification(null);
+    };
+  }, []);
 
   const [categoryOptions, setCategoryOptions] = useState<{ value: string; content: string }[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -140,13 +261,22 @@ return;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          categoryIds: categoryOptions
-            .filter((opt) => row.categories.includes(opt.content))
-            .map((opt) => Number(opt.value)),
+          categoryIds: row.categoryIds || [row.categoryId].filter(Boolean),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || 'Failed to activate');
+      
+      // Check if the discount had an end time that has passed
+      const now = new Date();
+      const hadExpiredEndTime = row.endDateTime && new Date(row.endDateTime) <= now;
+      
+      if (hadExpiredEndTime) {
+        setReloadNotification(`Discount "${row.name}" has been activated. The end time has been cleared since it had already passed.`);
+      } else {
+        setReloadNotification(`Discount "${row.name}" has been activated. Any existing active discount in this category has been deactivated.`);
+      }
+      
       await loadDiscounts();
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -160,9 +290,8 @@ return;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          categoryIds: categoryOptions
-            .filter((opt) => row.categories.includes(opt.content))
-            .map((opt) => Number(opt.value)),
+          categoryIds: row.categoryIds || [row.categoryId].filter(Boolean),
+          discountId: row.id, // Pass the discount ID to identify which discount to deactivate
         }),
       });
       const data = await res.json();
@@ -180,9 +309,8 @@ return;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          categoryIds: categoryOptions
-            .filter((opt) => row.categories.includes(opt.content))
-            .map((opt) => Number(opt.value)),
+          categoryIds: row.categoryIds || [row.categoryId].filter(Boolean),
+          discountId: row.id, // Pass the discount ID to identify which discount to delete
         }),
       });
       const data = await res.json();
@@ -209,7 +337,9 @@ return;
     // Set timing based on status and scheduled time
     if (row.status === 'Scheduled' && row.scheduledTime) {
       setApplyMode('schedule');
-      setScheduledTime(new Date(row.scheduledTime).toISOString().slice(0, 16));
+      // Convert UTC time to local datetime-local format
+      const localScheduledTime = new Date(row.scheduledTime);
+      setScheduledTime(localScheduledTime.toISOString().slice(0, 16));
     } else if (row.status === 'Active') {
       setApplyMode('apply');
       setScheduledTime('');
@@ -220,7 +350,9 @@ return;
     
     // Set end datetime if it exists
     if (row.endDateTime) {
-      setEndDateTime(new Date(row.endDateTime).toISOString().slice(0, 16));
+      // Convert UTC time to local datetime-local format
+      const localEndTime = new Date(row.endDateTime);
+      setEndDateTime(localEndTime.toISOString().slice(0, 16));
     } else {
       setEndDateTime('');
     }
@@ -232,6 +364,7 @@ return;
 
   const formatScheduledTime = (scheduledTime?: string) => {
     if (!scheduledTime) return '';
+    // Parse UTC time and display in local timezone
     const date = new Date(scheduledTime);
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -239,11 +372,12 @@ return;
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     
-return `${day}/${month}/${year} ${hours}:${minutes}`;
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
   };
 
   const formatEndDateTime = (endDateTime?: string) => {
     if (!endDateTime) return '';
+    // Parse UTC time and display in local timezone
     const date = new Date(endDateTime);
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -251,7 +385,7 @@ return `${day}/${month}/${year} ${hours}:${minutes}`;
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     
-return `${day}/${month}/${year} ${hours}:${minutes}`;
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
   };
 
   const columns = [
@@ -337,6 +471,7 @@ return;
       }
 
       if (applyMode === 'schedule') {
+        // Validate scheduled time (datetime-local is already in local timezone)
         const scheduledDate = new Date(scheduledTime);
         const now = new Date();
         if (scheduledDate <= now) {
@@ -348,6 +483,7 @@ return;
 
       // Validate end datetime if provided
       if (endDateTime) {
+        // Validate end time (datetime-local is already in local timezone)
         const endDate = new Date(endDateTime);
         const now = new Date();
         if (endDate <= now) {
@@ -385,8 +521,9 @@ return `${categoryText} - ${discountNumber}`;
         amount: Number(amount),
         startDate: startDate || null,
         endDate: endDate || null,
-        scheduledTime: applyMode === 'schedule' ? scheduledTime : null,
-        endDateTime: endDateTime || null,
+        // Convert local datetime to UTC ISO string for storage
+        scheduledTime: applyMode === 'schedule' ? new Date(scheduledTime).toISOString() : null,
+        endDateTime: endDateTime ? new Date(endDateTime).toISOString() : null,
         status: applyMode === 'create' ? 'Inactive' : applyMode === 'apply' ? 'Active' : 'Scheduled',
       };
       
@@ -433,6 +570,16 @@ return `${categoryText} - ${discountNumber}`;
 
   return (
     <Box>
+      {reloadNotification && (
+        <Box marginBottom="medium">
+          <Alert
+            type="info"
+            onClose={() => setReloadNotification(null)}
+            messages={[{ text: reloadNotification }]}
+          />
+        </Box>
+      )}
+      
       <Panel header="Discounts">
         {discountsLoading ? (
           <Box padding="large" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>

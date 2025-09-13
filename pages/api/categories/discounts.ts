@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { bigcommerceClient, getSession } from '../../../lib/auth';
 
 const NAMESPACE = 'discounts';
-const KEY = 'rule';
+// We'll use unique keys for each discount instead of a single 'rule' key
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -11,51 +11,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'GET') {
       const { data: cats } = await bc.get('/catalog/categories?limit=250');
-      const rows: Array<{ categoryId: number; categoryName: string; rule: any }> = [];
+      const discountMap = new Map(); // Use Map to group discounts by their unique key
 
       for (const c of cats) {
         const { data: mfs } = await bc.get(`/catalog/categories/${c.id}/metafields`);
-        const mf = (mfs || []).find((m: any) => m.namespace === NAMESPACE && m.key === KEY);
-        if (!mf) continue;
-        let rule: any = null;
-        try {
-          rule = typeof mf.value === 'string' ? JSON.parse(mf.value) : mf.value;
-        } catch {
-          continue;
+        // Get all discount metafields for this category (multiple discounts allowed)
+        const discountMetafields = (mfs || []).filter((m: any) => m.namespace === NAMESPACE);
+        
+        for (const mf of discountMetafields) {
+          let rule: any = null;
+          try {
+            rule = typeof mf.value === 'string' ? JSON.parse(mf.value) : mf.value;
+          } catch {
+            continue;
+          }
+          
+          const discountKey = mf.key; // Use the metafield key as the unique identifier
+          
+          if (!discountMap.has(discountKey)) {
+            // Create new discount entry
+            discountMap.set(discountKey, {
+              id: discountKey, // Use the metafield key as the unique ID
+              name: rule?.name,
+              type: rule?.type,
+              amount: Number(rule?.amount || 0),
+              startDate: rule?.startDate || undefined,
+              endDate: rule?.endDate || undefined,
+              scheduledTime: rule?.scheduledTime || undefined,
+              endDateTime: rule?.endDateTime || undefined,
+              status: rule?.status || 'Active',
+              categories: [],
+              categoryIds: rule?.categoryIds || [],
+              metafieldIds: [],
+              categoryMetafields: []
+            });
+          }
+          
+          // Add this category to the discount
+          const discount = discountMap.get(discountKey);
+          if (!discount.categories.includes(c.name)) {
+            discount.categories.push(c.name);
+          }
+          if (!discount.categoryIds.includes(c.id)) {
+            discount.categoryIds.push(c.id);
+          }
+          discount.metafieldIds.push(mf.id);
+          discount.categoryMetafields.push({
+            categoryId: c.id,
+            categoryName: c.name,
+            metafieldId: mf.id
+          });
         }
-        rows.push({ categoryId: c.id, categoryName: c.name, rule });
       }
 
-      const grouped: Record<string, any> = {};
-      for (const r of rows) {
-        const sig = JSON.stringify({
-          name: r.rule?.name,
-          type: r.rule?.type,
-          amount: r.rule?.amount,
-          startDate: r.rule?.startDate || null,
-          endDate: r.rule?.endDate || null,
-          scheduledTime: r.rule?.scheduledTime || null,
-          endDateTime: r.rule?.endDateTime || null,
-          status: r.rule?.status || 'Active',
-        });
-
-        if (!grouped[sig]) {
-          grouped[sig] = {
-            name: r.rule?.name,
-            type: r.rule?.type,
-            amount: Number(r.rule?.amount || 0),
-            startDate: r.rule?.startDate || undefined,
-            endDate: r.rule?.endDate || undefined,
-            scheduledTime: r.rule?.scheduledTime || undefined,
-            endDateTime: r.rule?.endDateTime || undefined,
-            status: r.rule?.status || 'Active',
-            categories: [] as string[],
-          };
-        }
-        grouped[sig].categories.push(r.categoryName);
-      }
-
-      return res.status(200).json({ data: Object.values(grouped) });
+      return res.status(200).json({ data: Array.from(discountMap.values()) });
     }
 
     if (req.method === 'POST') {
@@ -108,22 +117,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ message: 'Percent discount cannot exceed 100' });
       }
 
-      const payload = {
-        namespace: NAMESPACE,
-        key: KEY,
-        value: JSON.stringify({ name, type, amount: parsedAmount, startDate, endDate, scheduledTime, endDateTime, status }),
-        permission_set: 'app_only',
-      };
-
-      // Save/Update the metafield rule for each category (keeps UI listing intact)
-      for (const id of categoryIds) {
-        const { data: mfs } = await bc.get(`/catalog/categories/${id}/metafields`);
-        const existing = (mfs || []).find((m: any) => m.namespace === NAMESPACE && m.key === KEY);
-        if (existing) {
-          await bc.put(`/catalog/categories/${id}/metafields/${existing.id}`, payload);
-        } else {
-          await bc.post(`/catalog/categories/${id}/metafields`, payload);
+      // First, deactivate any existing active discounts in the selected categories
+      if (status === 'Active') {
+        for (const categoryId of categoryIds) {
+          const { data: mfs } = await bc.get(`/catalog/categories/${categoryId}/metafields`);
+          const discountMetafields = (mfs || []).filter((m: any) => m.namespace === NAMESPACE);
+          
+          for (const mf of discountMetafields) {
+            try {
+              const existingRule = JSON.parse(mf.value);
+              if (existingRule.status === 'Active') {
+                // Deactivate the existing active discount
+                const deactivatedRule = { ...existingRule, status: 'Inactive' };
+                await bc.put(`/catalog/categories/${categoryId}/metafields/${mf.id}`, {
+                  namespace: NAMESPACE,
+                  key: mf.key,
+                  value: JSON.stringify(deactivatedRule),
+                  permission_set: 'app_only',
+                });
+                
+                // Remove the discount from products
+                await removeDiscountFromCategory(bc, categoryId);
+                console.log(`Deactivated existing active discount "${existingRule.name}" in category ${categoryId}`);
+              }
+            } catch (error) {
+              console.error('Error processing existing discount:', error);
+            }
+          }
         }
+      }
+      
+      // Create a single discount record that references all categories
+      const uniqueKey = `discount_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const discountData = { 
+        name, 
+        type, 
+        amount: parsedAmount, 
+        startDate, 
+        endDate, 
+        scheduledTime, 
+        endDateTime, 
+        status,
+        categoryIds // Store the list of category IDs in the discount data
+      };
+      
+      // Store the discount in each category with the same key and data
+      for (const categoryId of categoryIds) {
+        const payload = {
+          namespace: NAMESPACE,
+          key: uniqueKey,
+          value: JSON.stringify(discountData),
+          permission_set: 'app_only',
+        };
+        
+        await bc.post(`/catalog/categories/${categoryId}/metafields`, payload);
       }
 
       // If this is a scheduled discount, don't apply price changes yet
@@ -215,6 +262,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(status).json({ message });
   }
+}
+
+async function removeDiscountFromCategory(bc: any, categoryId: number) {
+  console.log(`Removing discount from category ${categoryId}`);
+  
+  // For each category, fetch products and remove their sale_price (and variant sale_price)
+  let page = 1;
+  const limit = 250;
+  let totalPages = 1;
+  let productsProcessed = 0;
+
+  do {
+    const { data: products, meta } = await bc.get(`/catalog/products?categories:in=${categoryId}&limit=${limit}&page=${page}`);
+    totalPages = meta?.pagination?.total_pages || 1;
+
+    for (const p of products || []) {
+      console.log(`Removing sale price from product ${p.id} (${p.name})`);
+      
+      // Remove product sale price
+      await bc.put(`/catalog/products/${p.id}`, { 
+        sale_price: 0,
+        sale_price_start_date: '',
+        sale_price_end_date: ''
+      });
+
+      // Remove variants' sale prices as well
+      let vPage = 1;
+      let vTotalPages = 1;
+      const vLimit = 250;
+      do {
+        const { data: variants, meta: vMeta } = await bc.get(`/catalog/products/${p.id}/variants?limit=${vLimit}&page=${vPage}`);
+        vTotalPages = vMeta?.pagination?.total_pages || 1;
+
+        for (const v of variants || []) {
+          console.log(`Removing sale price from variant ${v.id}`);
+          await bc.put(`/catalog/products/${p.id}/variants/${v.id}`, { 
+            sale_price: 0,
+            sale_price_start_date: '',
+            sale_price_end_date: ''
+          });
+        }
+
+        vPage += 1;
+      } while (vPage <= vTotalPages);
+      
+      productsProcessed++;
+    }
+
+    page += 1;
+  } while (page <= totalPages);
+  
+  console.log(`Processed ${productsProcessed} products in category ${categoryId}`);
 }
 
 

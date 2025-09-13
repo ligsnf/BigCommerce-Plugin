@@ -2,11 +2,17 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { bigcommerceClient, getSession } from '../../../../lib/auth';
 
 const NAMESPACE = 'discounts';
-const KEY = 'rule';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { accessToken, storeHash } = await getSession(req);
+    // Handle context from query parameter (for frontend calls)
+    const context = req.query.context as string;
+    if (!context) {
+      return res.status(400).json({ message: 'Context parameter is required' });
+    }
+
+    // Decode the context to get session info
+    const { accessToken, storeHash } = await getSession({ query: { context } });
     const bc = bigcommerceClient(accessToken, storeHash);
 
     if (req.method !== 'POST') {
@@ -20,76 +26,124 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: categories } = await bc.get('/catalog/categories?limit=250');
 
     for (const category of categories) {
-      // Get metafields for this category
+      // Get all discount metafields for this category
       const { data: metafields } = await bc.get(`/catalog/categories/${category.id}/metafields`);
-      const discountMetafield = (metafields || []).find((mf: any) => mf.namespace === NAMESPACE && mf.key === KEY);
+      const discountMetafields = (metafields || []).filter((mf: any) => mf.namespace === NAMESPACE);
       
-      if (!discountMetafield) continue;
-
-      let rule: any = null;
-      try {
-        rule = typeof discountMetafield.value === 'string' ? JSON.parse(discountMetafield.value) : discountMetafield.value;
-      } catch {
-        continue;
-      }
-
-      // Check if this is a scheduled discount that should be activated
-      if (rule.status === 'Scheduled' && rule.scheduledTime) {
-        const scheduledTime = new Date(rule.scheduledTime);
-        
-        if (scheduledTime <= now) {
-          // Time to activate this discount
-          console.log(`Activating scheduled discount: ${rule.name} for category: ${category.name}`);
-          
-          // Update the rule status to Active
-          const updatedRule = {
-            ...rule,
-            status: 'Active',
-            scheduledTime: null // Clear the scheduled time
-          };
-
-          // Update the metafield
-          await bc.put(`/catalog/categories/${category.id}/metafields/${discountMetafield.id}`, {
-            namespace: NAMESPACE,
-            key: KEY,
-            value: JSON.stringify(updatedRule),
-            permission_set: 'app_only',
-          });
-
-          // Apply the discount to products in this category
-          await applyDiscountToCategory(bc, category.id, rule);
-          
-          activatedCount++;
+      for (const discountMetafield of discountMetafields) {
+        let rule: any = null;
+        try {
+          rule = typeof discountMetafield.value === 'string' ? JSON.parse(discountMetafield.value) : discountMetafield.value;
+        } catch {
+          continue;
         }
-      }
 
-      // Check if this is an active discount that should be deactivated
-      if (rule.status === 'Active' && rule.endDateTime) {
-        const endTime = new Date(rule.endDateTime);
-        
-        if (endTime <= now) {
-          // Time to deactivate this discount
-          console.log(`Deactivating expired discount: ${rule.name} for category: ${category.name}`);
+        // Check if this is a scheduled discount that should be activated
+        if (rule.status === 'Scheduled' && rule.scheduledTime) {
+          const scheduledTime = new Date(rule.scheduledTime);
           
-          // Update the rule status to Inactive
-          const updatedRule = {
-            ...rule,
-            status: 'Inactive',
-            endDateTime: null // Clear the end datetime
-          };
+          if (scheduledTime <= now) {
+            // Time to activate this discount
+            console.log(`Activating scheduled discount: ${rule.name} for category: ${category.name}`);
+            
+            // First, deactivate any existing active discounts in ALL categories that this discount affects
+            const allCategoryIds = rule.categoryIds || [category.id];
+            for (const catId of allCategoryIds) {
+              const { data: catMfs } = await bc.get(`/catalog/categories/${catId}/metafields`);
+              const catDiscountMetafields = (catMfs || []).filter((m: any) => m.namespace === NAMESPACE);
+              
+              for (const mf of catDiscountMetafields) {
+                try {
+                  const existingRule = JSON.parse(mf.value);
+                  if (existingRule.status === 'Active' && mf.key !== discountMetafield.key) {
+                    // Deactivate the existing active discount (but not the one we're about to activate)
+                    const deactivatedRule = { ...existingRule, status: 'Inactive' };
+                    await bc.put(`/catalog/categories/${catId}/metafields/${mf.id}`, {
+                      namespace: NAMESPACE,
+                      key: mf.key,
+                      value: JSON.stringify(deactivatedRule),
+                      permission_set: 'app_only',
+                    });
+                    
+                    // Remove the discount from products
+                    await removeDiscountFromCategory(bc, catId);
+                    console.log(`Deactivated existing active discount "${existingRule.name}" in category ${catId}`);
+                  }
+                } catch (error) {
+                  console.error('Error processing existing discount:', error);
+                }
+              }
+            }
+            
+            // Update the rule status to Active
+            const updatedRule = {
+              ...rule,
+              status: 'Active',
+              scheduledTime: null // Clear the scheduled time
+            };
 
-          // Update the metafield
-          await bc.put(`/catalog/categories/${category.id}/metafields/${discountMetafield.id}`, {
-            namespace: NAMESPACE,
-            key: KEY,
-            value: JSON.stringify(updatedRule),
-            permission_set: 'app_only',
-          });
+            // Update the metafield in ALL categories this discount affects
+            for (const catId of allCategoryIds) {
+              const { data: catMfs } = await bc.get(`/catalog/categories/${catId}/metafields`);
+              const catDiscountMetafields = (catMfs || []).filter((m: any) => m.namespace === NAMESPACE);
+              
+              for (const mf of catDiscountMetafields) {
+                if (mf.key === discountMetafield.key) {
+                  await bc.put(`/catalog/categories/${catId}/metafields/${mf.id}`, {
+                    namespace: NAMESPACE,
+                    key: mf.key,
+                    value: JSON.stringify(updatedRule),
+                    permission_set: 'app_only',
+                  });
+                  
+                  // Apply the discount to products in this category
+                  await applyDiscountToCategory(bc, catId, updatedRule);
+                }
+              }
+            }
+            
+            activatedCount++;
+          }
+        }
 
-          // Remove the discount from products in this category
-          await removeDiscountFromCategory(bc, category.id);
+        // Check if this is an active discount that should be deactivated
+        if (rule.status === 'Active' && rule.endDateTime) {
+          const endTime = new Date(rule.endDateTime);
           
-          activatedCount++; // Using same counter for both activation and deactivation
+          if (endTime <= now) {
+            // Time to deactivate this discount
+            console.log(`Deactivating expired discount: ${rule.name} for category: ${category.name}`);
+            
+            // Update the rule status to Inactive
+            const updatedRule = {
+              ...rule,
+              status: 'Inactive',
+              endDateTime: null // Clear the end datetime
+            };
+
+            // Update the metafield in ALL categories this discount affects
+            const allCategoryIds = rule.categoryIds || [category.id];
+            for (const catId of allCategoryIds) {
+              const { data: catMfs } = await bc.get(`/catalog/categories/${catId}/metafields`);
+              const catDiscountMetafields = (catMfs || []).filter((m: any) => m.namespace === NAMESPACE);
+              
+              for (const mf of catDiscountMetafields) {
+                if (mf.key === discountMetafield.key) {
+                  await bc.put(`/catalog/categories/${catId}/metafields/${mf.id}`, {
+                    namespace: NAMESPACE,
+                    key: mf.key,
+                    value: JSON.stringify(updatedRule),
+                    permission_set: 'app_only',
+                  });
+                  
+                  // Remove the discount from products in this category
+                  await removeDiscountFromCategory(bc, catId);
+                }
+              }
+            }
+            
+            activatedCount++; // Using same counter for both activation and deactivation
+          }
         }
       }
     }

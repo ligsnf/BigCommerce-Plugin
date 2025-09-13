@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { bigcommerceClient, getSession } from '../../../../lib/auth';
 
 const NAMESPACE = 'discounts';
-const KEY = 'rule';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -13,25 +12,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ message: 'Method not allowed' });
     }
 
-    const { categoryIds = [] } = req.body || {};
+    const { categoryIds = [], discountId } = req.body || {};
 
     if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
       return res.status(400).json({ message: 'Missing categoryIds' });
     }
 
+    if (!discountId) {
+      return res.status(400).json({ message: 'Missing discountId' });
+    }
+
+    let deletedCount = 0;
+
     // Remove the discount metafield from each category
     for (const categoryId of categoryIds) {
       try {
         const { data: metafields } = await bc.get(`/catalog/categories/${categoryId}/metafields`);
-        const discountMetafield = (metafields || []).find((mf: any) => mf.namespace === NAMESPACE && mf.key === KEY);
+        const discountMetafields = (metafields || []).filter((mf: any) => mf.namespace === NAMESPACE);
+        
+        // Find the specific discount to delete by its key
+        const discountMetafield = discountMetafields.find((mf: any) => mf.key === discountId);
         
         if (discountMetafield) {
-          // First remove sale prices from products in this category
-          await removeDiscountFromCategory(bc, categoryId);
+          // First remove sale prices from products in this category if the discount was active
+          try {
+            const discountData = JSON.parse(discountMetafield.value);
+            if (discountData.status === 'Active') {
+              await removeDiscountFromCategory(bc, categoryId);
+            }
+          } catch (error) {
+            console.error('Error parsing discount data:', error);
+          }
           
           // Then delete the metafield
           await bc.delete(`/catalog/categories/${categoryId}/metafields/${discountMetafield.id}`);
           console.log(`Deleted discount metafield from category ${categoryId}`);
+          deletedCount++;
         }
       } catch (error) {
         console.error(`Error deleting metafield from category ${categoryId}:`, error);
@@ -41,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ 
       message: 'Discount deleted successfully',
-      deletedFromCategories: categoryIds.length
+      deletedFromCategories: deletedCount
     });
 
   } catch (error: any) {
