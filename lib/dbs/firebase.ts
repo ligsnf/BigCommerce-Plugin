@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { deleteDoc, doc, getDoc, getFirestore, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, getFirestore, setDoc, updateDoc } from 'firebase/firestore';
 import { SessionProps, UserData } from '../../types';
 
 // Firebase config and initialization
@@ -105,6 +105,16 @@ export async function getStoreToken(storeHash: string) {
     const storeDoc = await getDoc(doc(db, 'store', storeHash));
 
     return storeDoc.data()?.accessToken ?? null;
+}
+
+export async function getAllStores() {
+    const storesRef = collection(db, 'store');
+    const snapshot = await getDocs(storesRef);
+    return snapshot.docs.map(doc => ({
+        storeHash: doc.id,
+        accessToken: doc.data().accessToken,
+        scope: doc.data().scope
+    }));
 }
 
 export async function deleteStore({ store_hash: storeHash }: SessionProps) {

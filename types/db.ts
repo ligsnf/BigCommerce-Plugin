@@ -17,6 +17,7 @@ export interface Db {
     setStore(session: SessionProps): Promise<void>;
     setStoreUser(session: SessionProps): Promise<void>;
     getStoreToken(storeId: string): Promise<string> | null;
+    getAllStores(): Promise<{ storeHash: string; accessToken: string; scope: string }[]>;
     deleteStore(session: SessionProps): Promise<void>;
     deleteUser(session: SessionProps): Promise<void>;
     hasAppExtensionsScope(storeHash: string): Promise<boolean>;
