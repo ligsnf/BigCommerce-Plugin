@@ -64,6 +64,7 @@ return;
       if (err instanceof TypeError && err.message.includes('fetch')) {
         console.log('Network error during scheduled discount check (session may not be ready)');
       } else {
+        
         console.error('Error checking scheduled discounts:', err);
       }
     }
