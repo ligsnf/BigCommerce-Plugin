@@ -1012,13 +1012,13 @@ return;
 
       if (isActuallyBundle) {
         alertsManager.add({
-          messages: [{ text: `Product saved as a bundle${hasMultipleVariants ? ' (variant-level)' : ''}.` }],
+          messages: [{ text: `Product saved as a bundle${hasMultipleVariants ? ' (variant-level)' : ''}. Please refresh the page to see all changes.` }],
           type: 'success',
           onClose: () => null,
         });
       } else {
         alertsManager.add({
-          messages: [{ text: 'Product saved as a regular product (not a bundle).' }],
+          messages: [{ text: 'Product saved as a regular product (not a bundle). Please refresh the page to see all changes.' }],
           type: 'success',
           onClose: () => null,
         });
