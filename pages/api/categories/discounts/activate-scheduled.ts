@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Decode the context to get session info
-    const { accessToken, storeHash } = await getSession({ query: { context } });
+    const { accessToken, storeHash } = await getSession(req);
     const bc = bigcommerceClient(accessToken, storeHash);
 
     if (req.method !== 'POST') {
