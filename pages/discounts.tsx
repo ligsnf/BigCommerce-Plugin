@@ -46,7 +46,7 @@ return;
         if (result.activatedCount > 0) {
           console.log(`Processed ${result.activatedCount} scheduled discounts`);
           // Show notification and automatically refresh the discounts
-          setReloadNotification(`${result.activatedCount} scheduled discount(s) have been processed (activated or deactivated).`);
+          setReloadNotification(`${result.activatedCount} scheduled discount(s) have been processed.`);
           // Automatically reload discounts to show the updated status
           await loadDiscounts();
         }
@@ -104,7 +104,7 @@ return;
 
     const interval = setInterval(() => {
       checkAndActivateScheduledDiscounts();
-    }, 60000); // Check every minute
+    }, 45000); // Check every 45 seconds
 
     return () => {
       clearTimeout(initialTimeout);
