@@ -44,9 +44,11 @@ return;
       if (res.ok) {
         const result = await res.json();
         if (result.activatedCount > 0) {
-          console.log(`Activated ${result.activatedCount} scheduled discounts`);
-          // Show notification instead of automatic reload
-          setReloadNotification(`${result.activatedCount} scheduled discount(s) have been activated. Please refresh the page to see the updated status.`);
+          console.log(`Processed ${result.activatedCount} scheduled discounts`);
+          // Show notification and automatically refresh the discounts
+          setReloadNotification(`${result.activatedCount} scheduled discount(s) have been processed (activated or deactivated).`);
+          // Automatically reload discounts to show the updated status
+          await loadDiscounts();
         }
       } else {
         // Handle API errors gracefully - don't log as error if it's a session issue
@@ -170,9 +172,9 @@ return;
       const hadExpiredEndTime = row.endDateTime && new Date(row.endDateTime) <= now;
       
       if (hadExpiredEndTime) {
-        setReloadNotification(`Discount "${row.name}" has been activated. The end time has been cleared since it had already passed. Please refresh the page to see the updated status.`);
+        setReloadNotification(`Discount "${row.name}" has been activated. The end time has been cleared since it had already passed.`);
       } else {
-        setReloadNotification(`Discount "${row.name}" has been activated. Any existing active discount in this category has been deactivated. Please refresh the page to see the updated status.`);
+        setReloadNotification(`Discount "${row.name}" has been activated. Any existing active discount in this category has been deactivated.`);
       }
       
       await loadDiscounts();
@@ -194,7 +196,7 @@ return;
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || 'Failed to deactivate');
-      setReloadNotification(`Discount "${row.name}" has been deactivated. Please refresh the page to see the updated status.`);
+      setReloadNotification(`Discount "${row.name}" has been deactivated.`);
       await loadDiscounts();
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -214,7 +216,7 @@ return;
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || 'Failed to delete');
-      setReloadNotification(`Discount "${row.name}" has been deleted. Please refresh the page to see the updated list.`);
+      setReloadNotification(`Discount "${row.name}" has been deleted.`);
       await loadDiscounts();
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -450,7 +452,7 @@ return `${categoryText} - ${discountNumber}`;
       
       // Show success message
       const actionText = applyMode === 'create' ? 'created' : applyMode === 'apply' ? 'applied' : 'scheduled';
-      setReloadNotification(`Discount "${finalDiscountName}" has been ${actionText} successfully. Please refresh the page to see the updated list.`);
+      setReloadNotification(`Discount "${finalDiscountName}" has been ${actionText} successfully.`);
       
       // Reset minimal fields and refresh list
       setDiscountName('');
