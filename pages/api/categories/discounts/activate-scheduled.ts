@@ -5,148 +5,59 @@ const NAMESPACE = 'discounts';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // Handle context from query parameter (for frontend calls)
+    // Handle context from query parameter (for frontend calls) or use env vars for cron
     const context = req.query.context as string;
-    if (!context) {
-      return res.status(400).json({ message: 'Context parameter is required' });
-    }
+    
+    let accessToken: string;
+    let storeHash: string;
+    
+    if (context) {
+      // Frontend call with context
+      const session = await getSession(req);
+      accessToken = session.accessToken;
+      storeHash = session.storeHash;
+    } else {
+      // Cron job call - get all stores from database and process each one
+      const db = await import('../../../../lib/db');
+      const stores = await db.default.getAllStores();
+      
+      if (!stores || stores.length === 0) {
+        return res.status(200).json({ 
+          activatedCount: 0, 
+          message: 'No stores found in database' 
+        });
+      }
 
-    // Decode the context to get session info
-    const { accessToken, storeHash } = await getSession(req);
-    const bc = bigcommerceClient(accessToken, storeHash);
+      // Process each store
+      let totalActivatedCount = 0;
+      const results = [];
+
+      for (const store of stores) {
+        try {
+          const bc = bigcommerceClient(store.accessToken, store.storeHash);
+          const activatedCount = await processStoreDiscounts(bc);
+          totalActivatedCount += activatedCount;
+          results.push({ storeHash: store.storeHash, activatedCount });
+        } catch (error) {
+          console.error(`Error processing store ${store.storeHash}:`, error);
+          results.push({ storeHash: store.storeHash, error: error.message });
+        }
+      }
+
+      return res.status(200).json({ 
+        activatedCount: totalActivatedCount,
+        results,
+        message: totalActivatedCount > 0 ? `Processed ${totalActivatedCount} scheduled discounts across ${stores.length} stores` : 'No scheduled discounts to process'
+      });
+    }
 
     if (req.method !== 'POST') {
       return res.status(405).json({ message: 'Method not allowed' });
     }
 
-    const now = new Date();
-    let activatedCount = 0;
-
-    // Get all categories
-    const { data: categories } = await bc.get('/catalog/categories?limit=250');
-
-    for (const category of categories) {
-      // Get all discount metafields for this category
-      const { data: metafields } = await bc.get(`/catalog/categories/${category.id}/metafields`);
-      const discountMetafields = (metafields || []).filter((mf: any) => mf.namespace === NAMESPACE);
-      
-      for (const discountMetafield of discountMetafields) {
-        let rule: any = null;
-        try {
-          rule = typeof discountMetafield.value === 'string' ? JSON.parse(discountMetafield.value) : discountMetafield.value;
-        } catch {
-          continue;
-        }
-
-        // Check if this is a scheduled discount that should be activated
-        if (rule.status === 'Scheduled' && rule.scheduledTime) {
-          const scheduledTime = new Date(rule.scheduledTime);
-          
-          if (scheduledTime <= now) {
-            // Time to activate this discount
-            console.log(`Activating scheduled discount: ${rule.name} for category: ${category.name}`);
-            
-            // First, deactivate any existing active discounts in ALL categories that this discount affects
-            const allCategoryIds = rule.categoryIds || [category.id];
-            for (const catId of allCategoryIds) {
-              const { data: catMfs } = await bc.get(`/catalog/categories/${catId}/metafields`);
-              const catDiscountMetafields = (catMfs || []).filter((m: any) => m.namespace === NAMESPACE);
-              
-              for (const mf of catDiscountMetafields) {
-                try {
-                  const existingRule = JSON.parse(mf.value);
-                  if (existingRule.status === 'Active' && mf.key !== discountMetafield.key) {
-                    // Deactivate the existing active discount (but not the one we're about to activate)
-                    const deactivatedRule = { ...existingRule, status: 'Inactive' };
-                    await bc.put(`/catalog/categories/${catId}/metafields/${mf.id}`, {
-                      namespace: NAMESPACE,
-                      key: mf.key,
-                      value: JSON.stringify(deactivatedRule),
-                      permission_set: 'app_only',
-                    });
-                    
-                    // Remove the discount from products
-                    await removeDiscountFromCategory(bc, catId);
-                    console.log(`Deactivated existing active discount "${existingRule.name}" in category ${catId}`);
-                  }
-                } catch (error) {
-                  console.error('Error processing existing discount:', error);
-                }
-              }
-            }
-            
-            // Update the rule status to Active
-            const updatedRule = {
-              ...rule,
-              status: 'Active',
-              scheduledTime: null // Clear the scheduled time
-            };
-
-            // Update the metafield in ALL categories this discount affects
-            for (const catId of allCategoryIds) {
-              const { data: catMfs } = await bc.get(`/catalog/categories/${catId}/metafields`);
-              const catDiscountMetafields = (catMfs || []).filter((m: any) => m.namespace === NAMESPACE);
-              
-              for (const mf of catDiscountMetafields) {
-                if (mf.key === discountMetafield.key) {
-                  await bc.put(`/catalog/categories/${catId}/metafields/${mf.id}`, {
-                    namespace: NAMESPACE,
-                    key: mf.key,
-                    value: JSON.stringify(updatedRule),
-                    permission_set: 'app_only',
-                  });
-                  
-                  // Apply the discount to products in this category
-                  await applyDiscountToCategory(bc, catId, updatedRule);
-                }
-              }
-            }
-            
-            activatedCount++;
-          }
-        }
-
-        // Check if this is an active discount that should be deactivated
-        if (rule.status === 'Active' && rule.endDateTime) {
-          const endTime = new Date(rule.endDateTime);
-          
-          if (endTime <= now) {
-            // Time to deactivate this discount
-            console.log(`Deactivating expired discount: ${rule.name} for category: ${category.name}`);
-            
-            // Update the rule status to Inactive
-            const updatedRule = {
-              ...rule,
-              status: 'Inactive',
-              endDateTime: null // Clear the end datetime
-            };
-
-            // Update the metafield in ALL categories this discount affects
-            const allCategoryIds = rule.categoryIds || [category.id];
-            for (const catId of allCategoryIds) {
-              const { data: catMfs } = await bc.get(`/catalog/categories/${catId}/metafields`);
-              const catDiscountMetafields = (catMfs || []).filter((m: any) => m.namespace === NAMESPACE);
-              
-              for (const mf of catDiscountMetafields) {
-                if (mf.key === discountMetafield.key) {
-                  await bc.put(`/catalog/categories/${catId}/metafields/${mf.id}`, {
-                    namespace: NAMESPACE,
-                    key: mf.key,
-                    value: JSON.stringify(updatedRule),
-                    permission_set: 'app_only',
-                  });
-                  
-                  // Remove the discount from products in this category
-                  await removeDiscountFromCategory(bc, catId);
-                }
-              }
-            }
-            
-            activatedCount++; // Using same counter for both activation and deactivation
-          }
-        }
-      }
-    }
+    // Single store processing (frontend call)
+    const bc = bigcommerceClient(accessToken, storeHash);
+    const activatedCount = await processStoreDiscounts(bc);
 
     return res.status(200).json({ 
       activatedCount,
@@ -160,6 +71,139 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
 return res.status(status).json({ message });
   }
+}
+
+async function processStoreDiscounts(bc: any): Promise<number> {
+  const now = new Date();
+  let activatedCount = 0;
+
+  // Get all categories
+  const { data: categories } = await bc.get('/catalog/categories?limit=250');
+
+  for (const category of categories) {
+    // Get all discount metafields for this category
+    const { data: metafields } = await bc.get(`/catalog/categories/${category.id}/metafields`);
+    const discountMetafields = (metafields || []).filter((mf: any) => mf.namespace === NAMESPACE);
+    
+    for (const discountMetafield of discountMetafields) {
+      let rule: any = null;
+      try {
+        rule = typeof discountMetafield.value === 'string' ? JSON.parse(discountMetafield.value) : discountMetafield.value;
+      } catch {
+        continue;
+      }
+
+      // Check if this is a scheduled discount that should be activated
+      if (rule.status === 'Scheduled' && rule.scheduledTime) {
+        const scheduledTime = new Date(rule.scheduledTime);
+        
+        if (scheduledTime <= now) {
+          // Time to activate this discount
+          console.log(`Activating scheduled discount: ${rule.name} for category: ${category.name}`);
+          
+          // First, deactivate any existing active discounts in ALL categories that this discount affects
+          const allCategoryIds = rule.categoryIds || [category.id];
+          for (const catId of allCategoryIds) {
+            const { data: catMfs } = await bc.get(`/catalog/categories/${catId}/metafields`);
+            const catDiscountMetafields = (catMfs || []).filter((m: any) => m.namespace === NAMESPACE);
+            
+            for (const mf of catDiscountMetafields) {
+              try {
+                const existingRule = JSON.parse(mf.value);
+                if (existingRule.status === 'Active' && mf.key !== discountMetafield.key) {
+                  // Deactivate the existing active discount (but not the one we're about to activate)
+                  const deactivatedRule = { ...existingRule, status: 'Inactive' };
+                  await bc.put(`/catalog/categories/${catId}/metafields/${mf.id}`, {
+                    namespace: NAMESPACE,
+                    key: mf.key,
+                    value: JSON.stringify(deactivatedRule),
+                    permission_set: 'app_only',
+                  });
+                  
+                  // Remove the discount from products
+                  await removeDiscountFromCategory(bc, catId);
+                  console.log(`Deactivated existing active discount "${existingRule.name}" in category ${catId}`);
+                }
+              } catch (error) {
+                console.error('Error processing existing discount:', error);
+              }
+            }
+          }
+          
+          // Update the rule status to Active
+          const updatedRule = {
+            ...rule,
+            status: 'Active',
+            scheduledTime: null // Clear the scheduled time
+          };
+
+          // Update the metafield in ALL categories this discount affects
+          for (const catId of allCategoryIds) {
+            const { data: catMfs } = await bc.get(`/catalog/categories/${catId}/metafields`);
+            const catDiscountMetafields = (catMfs || []).filter((m: any) => m.namespace === NAMESPACE);
+            
+            for (const mf of catDiscountMetafields) {
+              if (mf.key === discountMetafield.key) {
+                await bc.put(`/catalog/categories/${catId}/metafields/${mf.id}`, {
+                  namespace: NAMESPACE,
+                  key: mf.key,
+                  value: JSON.stringify(updatedRule),
+                  permission_set: 'app_only',
+                });
+                
+                // Apply the discount to products in this category
+                await applyDiscountToCategory(bc, catId, updatedRule);
+              }
+            }
+          }
+          
+          activatedCount++;
+        }
+      }
+
+      // Check if this is an active discount that should be deactivated
+      if (rule.status === 'Active' && rule.endDateTime) {
+        const endTime = new Date(rule.endDateTime);
+        
+        if (endTime <= now) {
+          // Time to deactivate this discount
+          console.log(`Deactivating expired discount: ${rule.name} for category: ${category.name}`);
+          
+          // Update the rule status to Inactive
+          const updatedRule = {
+            ...rule,
+            status: 'Inactive',
+            endDateTime: null // Clear the end datetime
+          };
+
+          // Update the metafield in ALL categories this discount affects
+          const allCategoryIds = rule.categoryIds || [category.id];
+          for (const catId of allCategoryIds) {
+            const { data: catMfs } = await bc.get(`/catalog/categories/${catId}/metafields`);
+            const catDiscountMetafields = (catMfs || []).filter((m: any) => m.namespace === NAMESPACE);
+            
+            for (const mf of catDiscountMetafields) {
+              if (mf.key === discountMetafield.key) {
+                await bc.put(`/catalog/categories/${catId}/metafields/${mf.id}`, {
+                  namespace: NAMESPACE,
+                  key: mf.key,
+                  value: JSON.stringify(updatedRule),
+                  permission_set: 'app_only',
+                });
+                
+                // Remove the discount from products in this category
+                await removeDiscountFromCategory(bc, catId);
+              }
+            }
+          }
+          
+          activatedCount++; // Using same counter for both activation and deactivation
+        }
+      }
+    }
+  }
+
+  return activatedCount;
 }
 
 async function applyDiscountToCategory(bc: any, categoryId: number, rule: any) {

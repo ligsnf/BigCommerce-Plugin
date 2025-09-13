@@ -76,6 +76,15 @@ export async function getStoreToken(storeHash: string) {
     return results.length ? results[0].accessToken : null;
 }
 
+export async function getAllStores() {
+    const results = await query('SELECT storeHash, accessToken, scope FROM stores');
+    return results.map((row: any) => ({
+        storeHash: row.storeHash,
+        accessToken: row.accessToken,
+        scope: row.scope
+    }));
+}
+
 export async function deleteStore({ store_hash: storeHash }: SessionProps) {
     await query('DELETE FROM stores WHERE storeHash = ?', storeHash);
 }

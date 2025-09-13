@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/categories/discounts/activate-scheduled",
+      "schedule": "*/1 * * * *"
+    }
+  ]
+}
