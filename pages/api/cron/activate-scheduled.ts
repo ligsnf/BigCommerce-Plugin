@@ -4,26 +4,30 @@ import { bigcommerceClient } from '../../../lib/auth';
 const NAMESPACE = 'discounts';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Allow both GET and POST for testing
-  if (req.method !== 'POST' && req.method !== 'GET') {
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
-
+  // Allow all methods for debugging
+  console.log('Cron endpoint called with method:', req.method);
+  
   // For GET requests, return a simple status (useful for testing)
   if (req.method === 'GET') {
     return res.status(200).json({ 
       status: 'Cron endpoint is working',
       timestamp: new Date().toISOString(),
-      method: 'GET'
+      method: 'GET',
+      message: 'Use POST method with X-Cron-Secret header for actual cron job'
     });
   }
 
   // Simple authentication for cron-jobs.org
   const cronSecret = req.headers['x-cron-secret'] || req.body?.secret;
+  console.log('Received secret:', cronSecret ? '***' : 'none');
+  console.log('Expected secret:', process.env.CRON_SECRET ? '***' : 'none');
+  
   if (cronSecret !== process.env.CRON_SECRET) {
     return res.status(401).json({ 
       message: 'Unauthorized - Invalid or missing CRON_SECRET',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      receivedSecret: cronSecret ? 'present' : 'missing',
+      expectedSecret: process.env.CRON_SECRET ? 'present' : 'missing'
     });
   }
 
