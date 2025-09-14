@@ -4,15 +4,27 @@ import { bigcommerceClient } from '../../../lib/auth';
 const NAMESPACE = 'discounts';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Only allow POST requests
-  if (req.method !== 'POST') {
+  // Allow both GET and POST for testing
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
+  }
+
+  // For GET requests, return a simple status (useful for testing)
+  if (req.method === 'GET') {
+    return res.status(200).json({ 
+      status: 'Cron endpoint is working',
+      timestamp: new Date().toISOString(),
+      method: 'GET'
+    });
   }
 
   // Simple authentication for cron-jobs.org
   const cronSecret = req.headers['x-cron-secret'] || req.body?.secret;
   if (cronSecret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ message: 'Unauthorized' });
+    return res.status(401).json({ 
+      message: 'Unauthorized - Invalid or missing CRON_SECRET',
+      timestamp: new Date().toISOString()
+    });
   }
 
   try {
