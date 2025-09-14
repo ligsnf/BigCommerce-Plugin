@@ -78,7 +78,8 @@ export async function getStoreToken(storeHash: string) {
 
 export async function getAllStores() {
     const results = await query('SELECT storeHash, accessToken, scope FROM stores');
-    return results.map((row: any) => ({
+    
+return results.map((row: any) => ({
         storeHash: row.storeHash,
         accessToken: row.accessToken,
         scope: row.scope

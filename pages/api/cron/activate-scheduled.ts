@@ -55,7 +55,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (error: any) {
     console.error('Error in cron job:', error);
-    return res.status(500).json({ 
+    
+return res.status(500).json({ 
       success: false,
       message: error?.message || 'Internal server error',
       timestamp: new Date().toISOString()

@@ -110,7 +110,8 @@ export async function getStoreToken(storeHash: string) {
 export async function getAllStores() {
     const storesRef = collection(db, 'store');
     const snapshot = await getDocs(storesRef);
-    return snapshot.docs.map(doc => ({
+    
+return snapshot.docs.map(doc => ({
         storeHash: doc.id,
         accessToken: doc.data().accessToken,
         scope: doc.data().scope

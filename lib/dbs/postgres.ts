@@ -88,7 +88,8 @@ export async function getStoreToken(storeHash: string) {
 export async function getAllStores() {
     const sqlQuery = 'SELECT store_hash, access_token, scope FROM stores';
     const results = await executeQuery(sqlQuery, []);
-    return results.map((row: any) => ({
+    
+return results.map((row: any) => ({
         storeHash: row.store_hash,
         accessToken: row.access_token,
         scope: row.scope
