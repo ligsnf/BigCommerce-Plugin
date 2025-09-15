@@ -13,6 +13,34 @@ const BundlesListPage = () => {
   const [error, setError] = useState(null);
   const router = useRouter();
   const { context } = useSession();
+  const [cleaning, setCleaning] = useState(false);
+  
+  const handleCleanup = async () => {
+    try {
+      if (!context) {
+        alert('Context is not available. Please open the app from BigCommerce.');
+
+        return;
+      }
+      const confirmCleanup = window.confirm('This will consolidate bundle metafields and remove duplicates across all products and variants. Continue?');
+      if (!confirmCleanup) return;
+
+      setCleaning(true);
+      const res = await fetch(`/api/productAppExtension/cleanup?context=${encodeURIComponent(context)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || 'Cleanup failed');
+      }
+      alert('Cleanup complete. Check console for details.');
+    } catch (e: any) {
+      alert(`Cleanup error: ${e?.message || e}`);
+    } finally {
+      setCleaning(false);
+    }
+  };
 
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this bundle?')) {
@@ -84,8 +112,11 @@ const BundlesListPage = () => {
 
   return (
     <Panel>
-      <Box marginBottom="large">
+      <Box marginBottom="large" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <H1>All Saved Bundles</H1>
+        <Button variant="secondary" isLoading={cleaning} disabled={cleaning || !context} onClick={handleCleanup}>
+          Cleanup bundles
+        </Button>
       </Box>
       <Box marginBottom="medium">
         <Button onClick={() => router.push('/bundles/create')}>

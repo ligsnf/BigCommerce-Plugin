@@ -1,6 +1,21 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from '@lib/auth';
 
+// Simple in-memory cache
+const serverCache = new Map<string, { value: any; expiresAt: number }>();
+const getCache = (key: string) => {
+  const e = serverCache.get(key);
+  if (!e) return null;
+  if (Date.now() > e.expiresAt) { serverCache.delete(key); 
+
+return null; }
+  
+return e.value;
+};
+const setCache = (key: string, value: any, ttlMs = 60_000) => {
+  serverCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { productId, variantId } = req.query;
 
@@ -14,6 +29,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // GET: Retrieve metafields
   if (req.method === 'GET') {
     try {
+      const cacheKey = `variant:metafields:${storeHash}:${productId}:${variantId}`;
+      const hit = getCache(cacheKey);
+      if (hit) {
+        res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=120');
+        
+return res.status(200).json(hit);
+      }
       const response = await fetch(baseUrl, {
         method: 'GET',
         headers: {
@@ -26,6 +48,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const isBundle = data.find(f => f.key === 'is_bundle')?.value === 'true';
       const linkedIdsRaw = data.find(f => f.key === 'linked_product_ids')?.value;
+      const overridePriceRaw = data.find(f => f.key === 'override_price')?.value;
+      const originalSkuRaw = data.find(f => f.key === 'original_sku')?.value;
       let linkedProductIds = linkedIdsRaw ? JSON.parse(linkedIdsRaw) : [];
       // Normalize: always return array of { productId, variantId, quantity }
       linkedProductIds = linkedProductIds.map(item => {
@@ -43,8 +67,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           };
         }
       });
+      const overridePrice = overridePriceRaw != null ? parseFloat(overridePriceRaw) : null;
+      const originalSku = originalSkuRaw != null ? String(originalSkuRaw) : null;
 
-      return res.status(200).json({ isBundle, linkedProductIds });
+      const payload = { isBundle, linkedProductIds, overridePrice, originalSku };
+      setCache(cacheKey, payload, 60_000);
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=120');
+      
+return res.status(200).json(payload);
     } catch (err: any) {
       console.error('[GET variant metafields] Error:', err);
 
@@ -55,7 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // POST: Save or update metafields
   if (req.method === 'POST') {
     try {
-      const { isBundle, linkedProductIds } = req.body;
+      const { isBundle, linkedProductIds, overridePrice, originalSku } = req.body;
 
       if (typeof isBundle !== 'boolean') {
         return res.status(400).json({ message: 'Missing or invalid isBundle' });
@@ -102,12 +132,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           description: 'Whether this variant is a bundle',
         },
         {
-          key: 'linked_product_ids',
+          key: 'linked_product_ids' ,
           value: JSON.stringify(normalizedLinkedProductIds),
           namespace: 'bundle',
           permission_set: 'app_only',
           description: 'Array of product/variant objects in the variant bundle',
-        }
+        },
+        ...(overridePrice != null && overridePrice !== '' ? [{
+          key: 'override_price',
+          value: String(overridePrice),
+          namespace: 'bundle',
+          permission_set: 'app_only',
+          description: 'Optional manual price override for the variant bundle',
+        }] : []),
+        ...(originalSku != null && originalSku !== '' ? [{
+          key: 'original_sku',
+          value: String(originalSku),
+          namespace: 'bundle',
+          permission_set: 'app_only',
+          description: 'Original SKU before variant bundle status',
+        }] : [])
       ];
 
       const responses = await Promise.all(
@@ -133,6 +177,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return result;
         })
       );
+
+      // Invalidate cache after update
+      serverCache.delete(`variant:metafields:${storeHash}:${productId}:${variantId}`);
+
+      // If overridePrice is not provided, delete existing override_price metafield if present
+      if ((overridePrice == null || overridePrice === '') && existingByKey['override_price']) {
+        try {
+          await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/variants/${variantId}/metafields/${existingByKey['override_price'].id}`, {
+            method: 'DELETE',
+            headers: {
+              'X-Auth-Token': accessToken,
+              Accept: 'application/json',
+            },
+          });
+        } catch (e) {
+          console.warn('[DELETE override_price metafield] Warning:', e);
+        }
+      }
 
       return res.status(200).json({ message: 'Variant metafields saved/updated', responses });
     } catch (err: any) {

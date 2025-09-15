@@ -4,7 +4,7 @@ import { CloseIcon } from '@bigcommerce/big-design-icons';
 interface BundleItemsTableProps {
   linkedProducts: any[];
   productQuantities: Record<string, number>;
-  onQuantityChange: (productId: number, quantity: number) => void;
+  onQuantityChange: (productId: number, quantity: number, variantId?: number | null) => void;
   onRemoveProduct: (productId: number) => void;
 }
 
@@ -14,7 +14,10 @@ const BundleItemsTable = ({
   onQuantityChange,
   onRemoveProduct
 }: BundleItemsTableProps) => {
-  if (linkedProducts.length === 0) return null;
+  if (linkedProducts.length === 0) {
+
+    return null;
+  }
 
   return (
     <Box marginTop="medium">
@@ -25,7 +28,7 @@ const BundleItemsTable = ({
           { 
             header: 'Quantity',
             hash: 'quantity',
-            width: '200px',
+            width: '100px',
             render: ({ value, productId, variantId }) => {
               const key = variantId ? `${productId}-${variantId}` : value.toString();
 
@@ -34,8 +37,8 @@ const BundleItemsTable = ({
                   type="number"
                   min="1"
                   value={productQuantities[key] || 1}
-                  onChange={(e) => onQuantityChange(value, parseInt(e.target.value))}
-                  style={{ width: '120px' }}
+                  onChange={(e) => onQuantityChange(value, parseInt(e.target.value), variantId)}
+                  style={{ width: '70px' }}
                 />
               );
             }

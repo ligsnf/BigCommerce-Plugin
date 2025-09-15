@@ -6,11 +6,15 @@ import InnerHeader from './innerHeader';
 export const TabIds = {
     HOME: 'home',
     PRODUCTS: 'products',
+    BUNDLES: 'bundles',
+    DISCOUNTS: 'discounts',
 };
 
 export const TabRoutes = {
     [TabIds.HOME]: '/',
     [TabIds.PRODUCTS]: '/products',
+    // [TabIds.BUNDLES]: '/bundles/list', // temporarily disabled
+    [TabIds.DISCOUNTS]: '/discounts',
 };
 
 const HeaderlessRoutes = [
@@ -56,17 +60,20 @@ const Header = () => {
     useEffect(() => {
         // Prefetch products page to reduce latency (doesn't prefetch in dev)
         router.prefetch('/products');
+        // router.prefetch('/bundles/list'); // temporarily disabled
     });
 
     const items = [
         { ariaControls: 'home', id: TabIds.HOME, title: 'Home' },
         { ariaControls: 'products', id: TabIds.PRODUCTS, title: 'Products' },
+        // { ariaControls: 'bundles', id: TabIds.BUNDLES, title: 'Bundles' }, // temporarily disabled
+        { ariaControls: 'discounts', id: TabIds.DISCOUNTS, title: 'Discounts' },
     ];
 
     const handleTabClick = (tabId: string) => {
         setActiveTab(tabId);
 
-        return router.push(TabRoutes[tabId]);
+        return router.push({ pathname: TabRoutes[tabId], query: router.query });
     };
 
     if (headerType === HeaderTypes.HEADERLESS) return null;

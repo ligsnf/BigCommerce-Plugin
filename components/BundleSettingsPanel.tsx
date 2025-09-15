@@ -1,10 +1,12 @@
-import { Box, Button, H4, Panel, Switch } from '@bigcommerce/big-design';
+import { Box, Button, H4, Input, Panel, Small, Switch } from '@bigcommerce/big-design';
 import BundleItemsTable from './BundleItemsTable';
 import ProductSelector from './ProductSelector';
 
 interface BundleSettingsPanelProps {
+  header?: string;
   isBundle: boolean;
   onBundleToggle: () => void;
+  isToggleDisabled?: boolean;
   combinedOptions: any[];
   selectedItem: any;
   onItemSelect: (item: any) => void;
@@ -20,13 +22,20 @@ interface BundleSettingsPanelProps {
   onVariantSelect: (variant: any) => void;
   variantLinkedProducts: Record<number, any[]>;
   variantProductQuantities: Record<number, Record<number, number>>;
-  onVariantQuantityChange: (variantId: number, productId: number, quantity: number) => void;
+  onVariantQuantityChange: (variantId: number, productId: number, linkedProductVariantId: number | null, quantity: number) => void;
   onVariantRemoveProduct: (variantId: number, productId: number) => void;
+  overridePrice: number | null;
+  onOverridePriceChange: (value: number | null) => void;
+  variantOverridePrices: Record<number, number | null>;
+  onVariantOverridePriceChange: (variantId: number, value: number | null) => void;
+  wasBundleOnLoad: boolean;
 }
 
 const BundleSettingsPanel = ({
+  header,
   isBundle,
   onBundleToggle,
+  isToggleDisabled,
   combinedOptions,
   selectedItem,
   onItemSelect,
@@ -44,6 +53,12 @@ const BundleSettingsPanel = ({
   variantProductQuantities,
   onVariantQuantityChange,
   onVariantRemoveProduct
+  ,
+  overridePrice,
+  onOverridePriceChange,
+  variantOverridePrices,
+  onVariantOverridePriceChange,
+  wasBundleOnLoad
 }: BundleSettingsPanelProps) => {
   const hasMultipleVariants = variants && variants.length > 1;
   const canSave = !isBundle || (
@@ -52,19 +67,66 @@ const BundleSettingsPanel = ({
       : linkedProducts.length > 0
   );
 
+  const getUnitPrice = (item: any) => {
+    // Try to resolve price from variants first (if variantId present), then fallback to product price
+    const pid = item.productId ?? item.value;
+    const vid = item.variantId ?? null;
+    const product = products.find((p: any) => p.value === pid);
+    if (!product) {
+      return Number(item.price ?? 0);
+    }
+
+    if (vid && Array.isArray(product.variants)) {
+      const variant = product.variants.find((v: any) => v.id === vid);
+      if (variant && variant.price != null) {
+        return Number(variant.price);
+      }
+    }
+
+    return Number(product.price ?? item.price ?? 0);
+  };
+
+  const formatPrice = (value: number) => `$${(Number(value) || 0).toFixed(2)}`;
+
+  const calculateMainBundlePrice = () => {
+    if (!isBundle) return 0;
+
+    return (linkedProducts || []).reduce((sum: number, p: any) => {
+      const key = p.variantId ? `${p.productId ?? p.value}-${p.variantId}` : (p.value ?? '').toString();
+      const qty = (productQuantities?.[key] ?? 1) as number;
+
+      return sum + getUnitPrice(p) * Math.max(1, Number(qty) || 1);
+    }, 0);
+  };
+
+  const calculateVariantBundlePrice = () => {
+    if (!isBundle || !selectedVariant) return 0;
+    const items = variantLinkedProducts?.[selectedVariant.id] || [];
+    const quantities = variantProductQuantities?.[selectedVariant.id] || {};
+
+    return items.reduce((sum: number, p: any) => {
+      const key = p.variantId ? `${p.productId ?? p.value}-${p.variantId}` : (p.value ?? '').toString();
+      const qty = (quantities?.[key] ?? 1) as number;
+      
+      return sum + getUnitPrice(p) * Math.max(1, Number(qty) || 1);
+    }, 0);
+  };
+
   const handleVariantSelect = (variant) => {
     // Clear the selected item when switching variants
     onItemSelect(null);
     onVariantSelect(variant);
   };
 
+
   return (
-    <Panel header="Bundle Settings">
+    <Panel header={header}>
       <Box marginBottom="medium">
         <H4>Is this product a bundle?</H4>
         <Switch
           checked={isBundle}
           onChange={onBundleToggle}
+          disabled={isToggleDisabled}
         />
       </Box>
 
@@ -105,9 +167,27 @@ const BundleSettingsPanel = ({
                   <BundleItemsTable
                     linkedProducts={variantLinkedProducts[selectedVariant.id] || []}
                     productQuantities={variantProductQuantities[selectedVariant.id] || {}}
-                    onQuantityChange={(productId, quantity) => onVariantQuantityChange(selectedVariant.id, productId, quantity)}
+                    onQuantityChange={(productId, quantity, linkedProductVariantId) => onVariantQuantityChange(selectedVariant.id, productId, linkedProductVariantId, quantity)}
                     onRemoveProduct={(productId) => onVariantRemoveProduct(selectedVariant.id, productId)}
                   />
+
+                  <Box marginTop="small">
+                    <Small>Calculated Price: {formatPrice(calculateVariantBundlePrice())}</Small>
+                  </Box>
+
+                  <Box marginTop="medium">
+                    <Input
+                      label="Override Price"
+                      type="number"
+                      iconLeft="$"
+                      value={variantOverridePrices[selectedVariant.id] ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const parsed = val === '' ? null : Number(val);
+                        onVariantOverridePriceChange(selectedVariant.id, isNaN(parsed as number) ? null : parsed);
+                      }}
+                    />
+                  </Box>
                 </>
               )}
             </>
@@ -125,21 +205,52 @@ const BundleSettingsPanel = ({
           <BundleItemsTable
             linkedProducts={linkedProducts}
             productQuantities={productQuantities}
-            onQuantityChange={onQuantityChange}
+            onQuantityChange={(productId, quantity) => onQuantityChange(productId, quantity)}
             onRemoveProduct={onRemoveProduct}
           />
+
+          <Box marginTop="small">
+            <Small>Calculated Price: {formatPrice(calculateMainBundlePrice())}</Small>
+          </Box>
+
+          <Box marginTop="medium">
+            <Input
+              label="Override Price"
+              type="number"
+              iconLeft="$"
+              value={overridePrice ?? ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                const parsed = val === '' ? null : Number(val);
+                onOverridePriceChange(isNaN(parsed as number) ? null : parsed);
+              }}
+            />
+          </Box>
             </>
           )}
         </Box>
       )}
 
+      {isBundle && hasMultipleVariants && !canSave && (
+        <Box marginBottom="xxSmall">
+          <Small color="danger">All variants must have products in order to save.</Small>
+        </Box>
+      )}
+
+      {wasBundleOnLoad && !isBundle && (
+        <Box marginBottom="xxSmall">
+          <Small color="danger">Saving will remove the bundle status for this product.</Small>
+        </Box>
+      )}
+
       <Button
+        actionType={wasBundleOnLoad && !isBundle ? 'destructive' : 'normal'}
         isLoading={saving}
         disabled={saving || !canSave}
         onClick={onSave}
         marginTop="medium"
       >
-        Save
+        {wasBundleOnLoad && !isBundle ? 'Remove bundle status' : 'Save'}
       </Button>
     </Panel>
   );
