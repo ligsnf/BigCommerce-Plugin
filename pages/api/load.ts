@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createAppExtension, getAppExtensions } from '@lib/appExtensions';
+import { createAppExtension, getAppExtensions, removeDuplicateAppExtensions } from '@lib/appExtensions';
 import db from '@lib/db';
 import { encodePayload, getBCVerify, setSession } from '../../lib/auth';
 import { ensureWebhookExists } from '../../lib/webhooks';
@@ -57,11 +57,21 @@ export default async function load(req: NextApiRequest, res: NextApiResponse) {
 
         const existingAppExtensionIds = data?.store?.appExtensions?.edges;
 
-        // If there are no app extensions returned, we assume we have not
-        // installed app extensions on this store, so we must install them.
-        
-        if (!existingAppExtensionIds?.length) {
+        // Check if we already have our specific app extension installed
+        // Look for app extensions with our specific URL pattern
+        const hasOurAppExtension = existingAppExtensionIds?.some((edge: any) => 
+            edge?.node?.url?.includes('/productAppExtension/')
+        );
+
+        // Clean up any duplicate app extensions first
+        await removeDuplicateAppExtensions({ accessToken, storeHash });
+
+        // Only create app extension if we don't already have one
+        if (!hasOurAppExtension) {
+          console.log('Creating app extension for store:', storeHash);
           await createAppExtension({ accessToken, storeHash });
+        } else {
+          console.log('App extension already exists for store:', storeHash);
         }
 
         // Ensure webhook exists for order events (safety check for existing installations)
