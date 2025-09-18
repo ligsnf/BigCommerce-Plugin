@@ -24,32 +24,51 @@ export async function ensureWebhookExists({ accessToken, storeHash, appUrl }: Cr
   const bc = bigcommerceClient(accessToken, storeHash);
 
   try {
-    // Check if webhook already exists
+    // Check if webhooks already exist
     const { data: existingWebhooks } = await bc.get('/hooks');
-    const orderWebhook = existingWebhooks.find((webhook: any) =>
-      webhook.scope === 'store/order/created' &&
-      webhook.destination === `${baseUrl}/api/webhooks/orders`
-    );
+    
+    // Define required webhooks
+    const requiredWebhooks = [
+      {
+        scope: 'store/order/created',
+        destination: `${baseUrl}/api/webhooks/orders`,
+        description: 'Order created webhook for bundle inventory management'
+      },
+      {
+        scope: 'store/product/updated',
+        destination: `${baseUrl}/api/webhooks/products`,
+        description: 'Product updated webhook for bundle inventory updates'
+      }
+    ];
 
-    if (orderWebhook) {
-      console.log(`✅ Webhook already exists for store ${storeHash}:`, orderWebhook.id);
+    const createdWebhooks = [];
 
-      return orderWebhook;
+    for (const webhookConfig of requiredWebhooks) {
+      const existingWebhook = existingWebhooks.find((webhook: any) =>
+        webhook.scope === webhookConfig.scope &&
+        webhook.destination === webhookConfig.destination
+      );
+
+      if (existingWebhook) {
+        console.log(`✅ Webhook already exists for ${webhookConfig.scope} in store ${storeHash}:`, existingWebhook.id);
+        createdWebhooks.push(existingWebhook);
+      } else {
+        // Create new webhook
+        const newWebhookConfig: WebhookConfig = {
+          scope: webhookConfig.scope,
+          destination: webhookConfig.destination,
+          is_active: true
+        };
+
+        const { data: newWebhook } = await bc.post('/hooks', newWebhookConfig);
+        console.log(`✅ Created webhook for ${webhookConfig.scope} in store ${storeHash}:`, newWebhook.id);
+        createdWebhooks.push(newWebhook);
+      }
     }
 
-    // Create new webhook
-    const webhookConfig: WebhookConfig = {
-      scope: 'store/order/created',
-      destination: `${baseUrl}/api/webhooks/orders`,
-      is_active: true
-    };
-
-    const { data: newWebhook } = await bc.post('/hooks', webhookConfig);
-    console.log(`✅ Created webhook for store ${storeHash}:`, newWebhook.id);
-
-    return newWebhook;
+    return createdWebhooks;
   } catch (error: any) {
-    console.error(`❌ Error managing webhook for store ${storeHash}:`, error.response?.data || error.message);
+    console.error(`❌ Error managing webhooks for store ${storeHash}:`, error.response?.data || error.message);
 
     // Don't throw error - webhook creation failure shouldn't break app installation
     // Log the error and continue
