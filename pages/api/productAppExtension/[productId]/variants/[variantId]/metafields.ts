@@ -44,7 +44,33 @@ return res.status(200).json(hit);
         },
       });
 
-      const { data } = await response.json();
+      if (!response.ok) {
+        console.error(`[GET variant metafields] API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`[GET variant metafields] Error response:`, errorText);
+        throw new Error(`BigCommerce API error: ${response.status} - ${errorText}`);
+      }
+
+      const responseText = await response.text();
+      if (!responseText.trim()) {
+        console.error('[GET variant metafields] Empty response from BigCommerce API');
+        const payload = { isBundle: false, linkedProductIds: [], overridePrice: null, originalSku: null };
+        setCache(cacheKey, payload, 60_000);
+        res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=120');
+        
+return res.status(200).json(payload);
+      }
+
+      let parsedResponse;
+      try {
+        parsedResponse = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('[GET variant metafields] Failed to parse response as JSON:', parseError);
+        console.error('[GET variant metafields] Raw response:', responseText);
+        throw new Error(`Invalid JSON response from BigCommerce API`);
+      }
+
+      const { data } = parsedResponse;
 
       const isBundle = data.find(f => f.key === 'is_bundle')?.value === 'true';
       const linkedIdsRaw = data.find(f => f.key === 'linked_product_ids')?.value;
