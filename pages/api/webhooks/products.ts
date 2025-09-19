@@ -50,6 +50,7 @@ async function updateAffectedBundles(productId: number, variantId: number | null
         id: product.id,
         linkedProductIds: productLinkedProductIds
       });
+      console.log(`[Product Update] Found product bundle: ${product.id} with ${productLinkedProductIds.length} linked products`);
     }
 
     // Check variant-level metafields
@@ -63,9 +64,12 @@ async function updateAffectedBundles(productId: number, variantId: number | null
           variantId: variant.id,
           linkedProductIds: variantLinkedProductIds
         });
+        console.log(`[Product Update] Found variant bundle: ${product.id}:${variant.id} with ${variantLinkedProductIds.length} linked products`);
       }
     }
   }
+  
+  console.log(`[Product Update] Total bundles found: ${bundleProducts.length} product bundles, ${bundleVariants.length} variant bundles`);
 
   // Find and update all product bundles that contain this product
   const affectedBundles = bundleProducts.filter(bundle => 
@@ -83,19 +87,32 @@ async function updateAffectedBundles(productId: number, variantId: number | null
   );
   
   // Find and update all variant bundles that contain this product
-  const affectedVariantBundles = bundleVariants.filter(bundle => 
-    bundle.linkedProductIds.some((linkedProduct: any) => {
+  const affectedVariantBundles = bundleVariants.filter(bundle => {
+    const matches = bundle.linkedProductIds.some((linkedProduct: any) => {
       const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
       const targetVariantId = typeof linkedProduct === 'object' ? linkedProduct.variantId : null;
       
+      console.log(`[Product Update] Checking variant bundle ${bundle.productId}:${bundle.variantId} - linked product: ${targetProductId}, variant: ${targetVariantId} vs updated: ${productId}, variant: ${variantId}`);
+      
       // Match product ID and variant ID (if specified)
       if (variantId) {
-        return targetProductId === productId && targetVariantId === variantId;
+        const match = targetProductId === productId && targetVariantId === variantId;
+        if (match) {
+          console.log(`[Product Update] ✅ Variant bundle match found: ${bundle.productId}:${bundle.variantId}`);
+        }
+        
+return match;
       } else {
         return targetProductId === productId && !targetVariantId;
       }
-    })
-  );
+    });
+    
+    if (matches) {
+      console.log(`[Product Update] ✅ Variant bundle ${bundle.productId}:${bundle.variantId} will be updated`);
+    }
+    
+    return matches;
+  });
   
   console.log(`[Product Update] Found ${affectedBundles.length} product bundles and ${affectedVariantBundles.length} variant bundles to update`);
   
@@ -165,6 +182,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     console.log(`[Product Update] Received ${scope} webhook for product ${product.id} in store ${storeHash}`);
+    console.log(`[Product Update] Webhook payload:`, JSON.stringify(product, null, 2));
 
     // Get the access token for this store from the database
     const accessToken = await db.getStoreToken(storeHash);
@@ -177,13 +195,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Handle product updates (covers both product and variant updates)
     if (scope === 'store/product/updated') {
-      // Check if this is a variant update or product update
-      if (product.variant_id) {
-        // Variant-level update
-        await updateAffectedBundles(product.product_id || product.id, product.variant_id, bc);
-      } else {
-        // Product-level update
-        await updateAffectedBundles(product.id, null, bc);
+      // For now, let's check if this product has variants and update all of them
+      // This is a more comprehensive approach since BigCommerce webhook payloads can vary
+      console.log(`[Product Update] Processing product update: product ${product.id}`);
+      
+      // First, update bundles that reference this product directly (not as a variant)
+      await updateAffectedBundles(product.id, null, bc);
+      
+      // Then, get all variants of this product and update bundles that reference those variants
+      try {
+        const { data: variants } = await bc.get(`/catalog/products/${product.id}/variants`);
+        console.log(`[Product Update] Found ${variants.length} variants for product ${product.id}`);
+        
+        for (const variant of variants) {
+          console.log(`[Product Update] Checking variant ${variant.id} for bundle updates`);
+          await updateAffectedBundles(product.id, variant.id, bc);
+        }
+      } catch (variantError) {
+        console.warn(`[Product Update] Could not fetch variants for product ${product.id}:`, variantError);
       }
     }
 
