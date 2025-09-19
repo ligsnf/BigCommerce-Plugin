@@ -17,13 +17,21 @@ const setCache = (key: string, value: any, ttlMs = 60_000) => {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const productId = req.query.productId;
+  try {
+    const productId = req.query.productId;
 
-  if (!productId || typeof productId !== 'string') {
-    return res.status(400).json({ message: 'Invalid product ID' });
-  }
+    if (!productId || typeof productId !== 'string') {
+      return res.status(400).json({ message: 'Invalid product ID' });
+    }
 
-  const { accessToken, storeHash } = await getSession(req);
+    const session = await getSession(req);
+    if (!session || !session.accessToken || !session.storeHash) {
+      console.error('[GET metafields] Session error:', session);
+      
+return res.status(401).json({ message: 'Invalid session or missing auth data' });
+    }
+
+    const { accessToken, storeHash } = session;
   const baseUrl = `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/metafields`;
 
   // GET: Retrieve metafields
@@ -240,6 +248,15 @@ return res.status(200).json(payload);
     }
   }
 
-  // Method not allowed
-  return res.status(405).setHeader('Allow', 'GET, POST').end('Method Not Allowed');
+    // Method not allowed
+    return res.status(405).setHeader('Allow', 'GET, POST').end('Method Not Allowed');
+  } catch (error: any) {
+    console.error('[metafields handler] Unexpected error:', error);
+    
+return res.status(500).json({ 
+      message: 'Internal server error', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
 }
