@@ -54,36 +54,18 @@ export default async function load(req: NextApiRequest, res: NextApiResponse) {
           // If cache says no extension, continue to create one
         }
 
-        // Add retry logic for rate limiting
-        let existingAppExtensions;
-        let retryCount = 0;
-        const maxRetries = 3;
-        
-        while (retryCount <= maxRetries) {
-            existingAppExtensions = await fetch(
-                `https://${process.env.API_URL}/stores/${storeHash}/graphql`,
-                {
-                    method: 'POST',
-                    headers: {
-                        accept: 'application/json',
-                        'content-type': 'application/json',
-                        'x-auth-token': accessToken,
-                    },
-                    body: JSON.stringify(getAppExtensions()),
-                }
-            );
-
-            if (existingAppExtensions.status !== 429) {
-                break; // Success or non-rate-limit error
+        const existingAppExtensions = await fetch(
+            `https://${process.env.API_URL}/stores/${storeHash}/graphql`,
+            {
+                method: 'POST',
+                headers: {
+                    accept: 'application/json',
+                    'content-type': 'application/json',
+                    'x-auth-token': accessToken,
+                },
+                body: JSON.stringify(getAppExtensions()),
             }
-
-            retryCount++;
-            if (retryCount <= maxRetries) {
-                const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 2s, 4s, 8s
-                console.log(`Rate limited, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-            }
-        }
+        );
 
         let data;
         try {
