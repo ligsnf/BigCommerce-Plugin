@@ -53,7 +53,29 @@ export default async function load(req: NextApiRequest, res: NextApiResponse) {
             }
         );
 
-        const { data } = await existingAppExtensions.json();
+        let data;
+        try {
+            if (!existingAppExtensions.ok) {
+                console.error(`GraphQL API error: ${existingAppExtensions.status} ${existingAppExtensions.statusText}`);
+                const errorText = await existingAppExtensions.text();
+                console.error('GraphQL API response:', errorText);
+                throw new Error(`GraphQL API failed: ${existingAppExtensions.status}`);
+            }
+            
+            const responseText = await existingAppExtensions.text();
+            if (!responseText.trim()) {
+                console.error('Empty response from GraphQL API');
+                data = { store: { appExtensions: { edges: [] } } };
+            } else {
+                const parsed = JSON.parse(responseText);
+                data = parsed.data || { store: { appExtensions: { edges: [] } } };
+            }
+        } catch (parseError) {
+            console.error('Failed to parse GraphQL response:', parseError);
+            console.error('Raw response:', await existingAppExtensions.text().catch(() => 'Could not read response'));
+            // Fallback to assuming no app extensions exist
+            data = { store: { appExtensions: { edges: [] } } };
+        }
 
         const existingAppExtensionIds = data?.store?.appExtensions?.edges;
 

@@ -50,7 +50,15 @@ return res.status(200).json(hit);
       const linkedIdsRaw = data.find(f => f.key === 'linked_product_ids')?.value;
       const overridePriceRaw = data.find(f => f.key === 'override_price')?.value;
       const originalSkuRaw = data.find(f => f.key === 'original_sku')?.value;
-      let linkedProductIds = linkedIdsRaw ? JSON.parse(linkedIdsRaw) : [];
+      let linkedProductIds = [];
+      if (linkedIdsRaw) {
+        try {
+          linkedProductIds = JSON.parse(linkedIdsRaw);
+        } catch (e) {
+          console.warn('[GET variant metafields] Invalid JSON in linked_product_ids:', linkedIdsRaw);
+          linkedProductIds = [];
+        }
+      }
       // Normalize: always return array of { productId, variantId, quantity }
       linkedProductIds = linkedProductIds.map(item => {
         if (typeof item === 'object' && item !== null) {

@@ -150,6 +150,20 @@ const ProductAppExtension = () => {
       return;
     }
 
+    // NEW: Check if product has variants but uses product-level tracking
+    if (hasMultipleVariants && product.inventory_tracking !== "variant") {
+      alertsManager.add({
+        messages: [{ 
+          text: `Cannot add "${product.label}": This product has variants but uses product-level inventory tracking. Please change it to "Track inventory by options" in the product settings for bundle calculations to work correctly.` 
+        }],
+        type: 'error',
+        onClose: () => null,
+      });
+      setSelectedItem(null);
+
+      return;
+    }
+
     const newProduct = {
       ...product,
       selectedSku: selectedItem.sku,
@@ -503,6 +517,30 @@ return;
           ? Object.values(variantLinkedProducts).some(products => (products as any[]).length > 0)
           : linkedProducts.length > 0
       );
+
+      // NEW: Validate tracking configuration of all linked products before saving
+      if (isActuallyBundle) {
+        const allLinkedProducts = hasMultipleVariants 
+          ? Object.values(variantLinkedProducts).flat()
+          : linkedProducts;
+        
+        for (const linkedProduct of allLinkedProducts as any[]) {
+          const productId = linkedProduct.productId || linkedProduct.value;
+          const productData = products.find(p => p.value === productId);
+          
+          if (productData && productData.variants && productData.variants.length > 1 && productData.inventory_tracking !== "variant") {
+            alertsManager.add({
+              messages: [{ 
+                text: `Cannot save bundle: "${productData.label}" has variants but uses product-level inventory tracking. Please change it to "Track inventory by options" in the product settings first.` 
+              }],
+              type: 'error',
+              onClose: () => null,
+            });
+            setSaving(false);
+            return;
+          }
+        }
+      }
 
       // Validate for duplicate SKUs across variants
       if (hasMultipleVariants && isActuallyBundle) {
