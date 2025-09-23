@@ -4,8 +4,7 @@ import db from '@lib/db';
 import { encodePayload, getBCVerify, setSession } from '../../lib/auth';
 import { ensureWebhookExists } from '../../lib/webhooks';
 
-// Simple cache to avoid repeated app extension checks
-const appExtensionCache = new Map<string, { hasExtension: boolean; expiresAt: number }>();
+// Removed caching to ensure webhook checks run on every load
 
 const buildRedirectUrl = (url: string, encodedContext: string) => {
     const [path, query = ''] = url.split('?');
@@ -43,16 +42,7 @@ export default async function load(req: NextApiRequest, res: NextApiResponse) {
           return res.redirect(302, buildRedirectUrl(session.url, encodedContext));
         }
 
-        // Check cache first to avoid unnecessary GraphQL calls
-        const cacheKey = `app_extension_${storeHash}`;
-        const cached = appExtensionCache.get(cacheKey);
-        if (cached && cached.expiresAt > Date.now()) {
-          console.log('Using cached app extension status for store:', storeHash);
-          if (cached.hasExtension) {
-            return res.redirect(302, buildRedirectUrl(session.url, encodedContext));
-          }
-          // If cache says no extension, continue to create one
-        }
+        // Removed caching to ensure webhook checks always run
 
         const existingAppExtensions = await fetch(
             `https://${process.env.API_URL}/stores/${storeHash}/graphql`,
@@ -105,32 +95,22 @@ export default async function load(req: NextApiRequest, res: NextApiResponse) {
             edge?.node?.url?.includes('/productAppExtension/')
         );
 
-        // Cache the result for 1 hour to avoid repeated GraphQL calls
-        appExtensionCache.set(cacheKey, {
-          hasExtension: hasOurAppExtension,
-          expiresAt: Date.now() + (60 * 60 * 1000) // 1 hour
-        });
+        // Removed caching to ensure webhook checks always run
 
         // Skip duplicate cleanup on every load - only create if needed
         if (!hasOurAppExtension) {
           console.log('Creating app extension for store:', storeHash);
           await createAppExtension({ accessToken, storeHash });
-          
-          // Update cache after creation
-          appExtensionCache.set(cacheKey, {
-            hasExtension: true,
-            expiresAt: Date.now() + (60 * 60 * 1000)
-          });
-
-          // Only check webhook when creating new extension
-          try {
-              await ensureWebhookExists({ accessToken, storeHash });
-          } catch (webhookError) {
-              // Log webhook creation error but don't fail the app load
-              console.error('Failed to ensure webhook exists during app load:', webhookError);
-          }
         } else {
           console.log('App extension already exists for store:', storeHash);
+        }
+
+        // Always check and ensure webhooks are active on every app load
+        try {
+            await ensureWebhookExists({ accessToken, storeHash });
+        } catch (webhookError) {
+            // Log webhook creation error but don't fail the app load
+            console.error('Failed to ensure webhook exists during app load:', webhookError);
         }
 
         res.redirect(302, buildRedirectUrl(session.url, encodedContext));
