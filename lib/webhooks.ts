@@ -50,8 +50,24 @@ export async function ensureWebhookExists({ accessToken, storeHash, appUrl }: Cr
       );
 
       if (existingWebhook) {
-        console.log(`✅ Webhook already exists for ${webhookConfig.scope} in store ${storeHash}:`, existingWebhook.id);
-        createdWebhooks.push(existingWebhook);
+        // Check if webhook is active, reactivate if needed
+        if (!existingWebhook.is_active) {
+          try {
+            const { data: updatedWebhook } = await bc.put(`/hooks/${existingWebhook.id}`, {
+              scope: existingWebhook.scope,
+              destination: existingWebhook.destination,
+              is_active: true
+            });
+            console.log(`🔄 Reactivated webhook for ${webhookConfig.scope} in store ${storeHash}:`, existingWebhook.id);
+            createdWebhooks.push(updatedWebhook);
+          } catch (updateError: any) {
+            console.error(`❌ Failed to reactivate webhook ${existingWebhook.id}:`, updateError.response?.data || updateError.message);
+            createdWebhooks.push(existingWebhook);
+          }
+        } else {
+          console.log(`✅ Webhook already exists and is active for ${webhookConfig.scope} in store ${storeHash}:`, existingWebhook.id);
+          createdWebhooks.push(existingWebhook);
+        }
       } else {
         // Create new webhook
         const newWebhookConfig: WebhookConfig = {
