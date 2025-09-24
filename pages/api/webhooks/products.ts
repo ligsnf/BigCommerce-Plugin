@@ -31,22 +31,38 @@ function parseLinkedProduct(linkedProduct: any) {
   };
 }
 
+// Helper function to get bundle category ID
+async function getBundleCategoryId(bc: any) {
+  const { data: categories } = await bc.get('/catalog/categories?limit=250');
+  const bundleCategory = categories.find((c: any) => String(c?.name || '').toLowerCase() === 'bundle');
+  return bundleCategory?.id;
+}
+
 // Helper function to update affected bundles when a product's inventory changes
-async function updateAffectedBundles(productId: number, variantId: number | null, bc: any) {
+async function updateAffectedBundles(productId: number, variantId: number | null, bc: any, storeHash: string, accessToken: string) {
   console.log(`[Product Update] Updating bundles affected by product ${productId}${variantId ? ` variant ${variantId}` : ''}`);
   
-  // Get all products that are bundles
-  const { data: allProducts } = await bc.get('/catalog/products');
-  const bundleProducts = [];
-  const bundleVariants = [];
+  // Get bundle category ID
+  const bundleCategoryId = await getBundleCategoryId(bc);
+  if (!bundleCategoryId) {
+    console.log(`[Product Update] No bundle category found, skipping bundle updates`);
+    return;
+  }
   
-  // Find all bundles and their details
-  for (const product of allProducts) {
+  // Get only products in the bundle category - MASSIVE performance improvement!
+  const { data: bundleProducts } = await bc.get(`/catalog/products?categories:in=${bundleCategoryId}`);
+  console.log(`[Product Update] Found ${bundleProducts.length} products in bundle category`);
+  
+  const productBundles = [];
+  const variantBundles = [];
+  
+  // Check each bundle product for metafields
+  for (const product of bundleProducts) {
     // Check product-level metafields
     const { isBundle: isProductBundle, linkedProductIds: productLinkedProductIds } = await getProductBundleInfo(product.id, bc);
     
     if (isProductBundle) {
-      bundleProducts.push({
+      productBundles.push({
         id: product.id,
         linkedProductIds: productLinkedProductIds
       });
@@ -59,7 +75,7 @@ async function updateAffectedBundles(productId: number, variantId: number | null
       const { isBundle: isVariantBundle, linkedProductIds: variantLinkedProductIds } = await getVariantBundleInfo(product.id, variant.id, bc);
       
       if (isVariantBundle) {
-        bundleVariants.push({
+        variantBundles.push({
           productId: product.id,
           variantId: variant.id,
           linkedProductIds: variantLinkedProductIds
@@ -69,10 +85,10 @@ async function updateAffectedBundles(productId: number, variantId: number | null
     }
   }
   
-  console.log(`[Product Update] Total bundles found: ${bundleProducts.length} product bundles, ${bundleVariants.length} variant bundles`);
+  console.log(`[Product Update] Total bundles found: ${productBundles.length} product bundles, ${variantBundles.length} variant bundles`);
 
   // Find and update all product bundles that contain this product
-  const affectedBundles = bundleProducts.filter(bundle => 
+  const affectedBundles = productBundles.filter(bundle => 
     bundle.linkedProductIds.some((linkedProduct: any) => {
       const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
       const targetVariantId = typeof linkedProduct === 'object' ? linkedProduct.variantId : null;
@@ -87,7 +103,7 @@ async function updateAffectedBundles(productId: number, variantId: number | null
   );
   
   // Find and update all variant bundles that contain this product
-  const affectedVariantBundles = bundleVariants.filter(bundle => {
+  const affectedVariantBundles = variantBundles.filter(bundle => {
     const matches = bundle.linkedProductIds.some((linkedProduct: any) => {
       const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
       const targetVariantId = typeof linkedProduct === 'object' ? linkedProduct.variantId : null;
@@ -134,9 +150,23 @@ return match;
     }
     
     const newInventoryLevel = Math.max(0, minPossibleBundles);
-    await bc.put(`/catalog/products/${bundle.id}`, {
-      inventory_level: newInventoryLevel
+    
+    // Update with header to prevent webhook loops
+    const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${bundle.id}`, {
+      method: 'PUT',
+      headers: {
+        'X-Auth-Token': accessToken,
+        'Content-Type': 'application/json',
+        'X-Bundle-App-Update': 'true' // Prevent webhook loops
+      },
+      body: JSON.stringify({
+        inventory_level: newInventoryLevel
+      })
     });
+    
+    if (!response.ok) {
+      console.error(`[Product Update] Failed to update bundle ${bundle.id}: ${response.status}`);
+    }
     
     console.log(`[Product Update] Updated product bundle ${bundle.id} inventory to ${newInventoryLevel}`);
   }
@@ -159,9 +189,23 @@ return match;
     }
     
     const newInventoryLevel = Math.max(0, minPossibleBundles);
-    await bc.put(`/catalog/products/${bundle.productId}/variants/${bundle.variantId}`, {
-      inventory_level: newInventoryLevel
+    
+    // Update with header to prevent webhook loops
+    const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${bundle.productId}/variants/${bundle.variantId}`, {
+      method: 'PUT',
+      headers: {
+        'X-Auth-Token': accessToken,
+        'Content-Type': 'application/json',
+        'X-Bundle-App-Update': 'true' // Prevent webhook loops
+      },
+      body: JSON.stringify({
+        inventory_level: newInventoryLevel
+      })
     });
+    
+    if (!response.ok) {
+      console.error(`[Product Update] Failed to update variant bundle ${bundle.productId}:${bundle.variantId}: ${response.status}`);
+    }
     
     console.log(`[Product Update] Updated variant bundle ${bundle.productId}:${bundle.variantId} inventory to ${newInventoryLevel}`);
   }
@@ -171,6 +215,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') return res.status(405).end('Method Not Allowed');
 
   try {
+    // Prevent webhook loops - skip if this update was triggered by our app
+    const isFromApp = req.headers['x-bundle-app-update'] === 'true';
+    if (isFromApp) {
+      console.log('[Product Update] Skipping app-generated update to prevent loops');
+      return res.status(200).json({ message: 'Skipped app-generated update' });
+    }
+
     const product = req.body.data;
     const scope = req.body.scope;
     
@@ -183,6 +234,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(`[Product Update] Received ${scope} webhook for product ${product.id} in store ${storeHash}`);
     console.log(`[Product Update] Webhook payload:`, JSON.stringify(product, null, 2));
+
+    // Only process updates that affect inventory-related fields to avoid unnecessary processing
+    const inventoryFields = ['inventory_level', 'inventory_tracking', 'is_visible', 'availability'];
+    const hasInventoryChanges = inventoryFields.some(field => product.hasOwnProperty(field));
+    
+    if (!hasInventoryChanges) {
+      console.log(`[Product Update] No inventory-related changes detected, skipping bundle updates`);
+      return res.status(200).json({ message: 'No inventory changes to process' });
+    }
 
     // Get the access token for this store from the database
     const accessToken = await db.getStoreToken(storeHash);
@@ -200,7 +260,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log(`[Product Update] Processing product update: product ${product.id}`);
       
       // First, update bundles that reference this product directly (not as a variant)
-      await updateAffectedBundles(product.id, null, bc);
+      await updateAffectedBundles(product.id, null, bc, storeHash, accessToken);
       
       // Then, get all variants of this product and update bundles that reference those variants
       try {
@@ -209,7 +269,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         for (const variant of variants) {
           console.log(`[Product Update] Checking variant ${variant.id} for bundle updates`);
-          await updateAffectedBundles(product.id, variant.id, bc);
+          await updateAffectedBundles(product.id, variant.id, bc, storeHash, accessToken);
         }
       } catch (variantError) {
         console.warn(`[Product Update] Could not fetch variants for product ${product.id}:`, variantError);

@@ -4,7 +4,8 @@ import db from '@lib/db';
 import { encodePayload, getBCVerify, setSession } from '../../lib/auth';
 import { ensureWebhookExists } from '../../lib/webhooks';
 
-// Removed caching to ensure webhook checks run on every load
+// Smart cache - only cache app extensions, always check webhooks
+const appExtensionCache = new Map<string, { hasExtension: boolean; expiresAt: number }>();
 
 const buildRedirectUrl = (url: string, encodedContext: string) => {
     const [path, query = ''] = url.split('?');
@@ -42,60 +43,74 @@ export default async function load(req: NextApiRequest, res: NextApiResponse) {
           return res.redirect(302, buildRedirectUrl(session.url, encodedContext));
         }
 
-        // Removed caching to ensure webhook checks always run
+        // Check cache for app extensions only (not webhooks)
+        const cacheKey = `app_extension_${storeHash}`;
+        const cached = appExtensionCache.get(cacheKey);
+        let hasOurAppExtension;
 
-        const existingAppExtensions = await fetch(
-            `https://${process.env.API_URL}/stores/${storeHash}/graphql`,
-            {
-                method: 'POST',
-                headers: {
-                    accept: 'application/json',
-                    'content-type': 'application/json',
-                    'x-auth-token': accessToken,
-                },
-                body: JSON.stringify(getAppExtensions()),
-            }
-        );
+        if (cached && cached.expiresAt > Date.now()) {
+          console.log('Using cached app extension status for store:', storeHash);
+          hasOurAppExtension = cached.hasExtension;
+        } else {
+          console.log('Checking app extensions via GraphQL for store:', storeHash);
+          
+          const existingAppExtensions = await fetch(
+              `https://${process.env.API_URL}/stores/${storeHash}/graphql`,
+              {
+                  method: 'POST',
+                  headers: {
+                      accept: 'application/json',
+                      'content-type': 'application/json',
+                      'x-auth-token': accessToken,
+                  },
+                  body: JSON.stringify(getAppExtensions()),
+              }
+          );
 
-        let data;
-        try {
-            if (!existingAppExtensions.ok) {
-                console.error(`GraphQL API error: ${existingAppExtensions.status} ${existingAppExtensions.statusText}`);
-                const errorText = await existingAppExtensions.text();
-                console.error('GraphQL API response:', errorText);
-                // If still rate limited after retries, skip app extension check
-                if (existingAppExtensions.status === 429) {
-                    console.warn('Still rate limited after retries, skipping app extension check');
-                    data = { store: { appExtensions: { edges: [] } } };
-                } else {
-                    throw new Error(`GraphQL API failed: ${existingAppExtensions.status}`);
-                }
-            } else {
-                const responseText = await existingAppExtensions.text();
-                if (!responseText.trim()) {
-                    console.error('Empty response from GraphQL API');
-                    data = { store: { appExtensions: { edges: [] } } };
-                } else {
-                    const parsed = JSON.parse(responseText);
-                    data = parsed.data || { store: { appExtensions: { edges: [] } } };
-                }
-            }
-        } catch (parseError) {
-            console.error('Failed to parse GraphQL response:', parseError);
-            console.error('Raw response:', await existingAppExtensions.text().catch(() => 'Could not read response'));
-            // Fallback to assuming no app extensions exist
-            data = { store: { appExtensions: { edges: [] } } };
+          let data;
+          try {
+              if (!existingAppExtensions.ok) {
+                  console.error(`GraphQL API error: ${existingAppExtensions.status} ${existingAppExtensions.statusText}`);
+                  const errorText = await existingAppExtensions.text();
+                  console.error('GraphQL API response:', errorText);
+                  // If still rate limited after retries, skip app extension check
+                  if (existingAppExtensions.status === 429) {
+                      console.warn('Still rate limited after retries, skipping app extension check');
+                      data = { store: { appExtensions: { edges: [] } } };
+                  } else {
+                      throw new Error(`GraphQL API failed: ${existingAppExtensions.status}`);
+                  }
+              } else {
+                  const responseText = await existingAppExtensions.text();
+                  if (!responseText.trim()) {
+                      console.error('Empty response from GraphQL API');
+                      data = { store: { appExtensions: { edges: [] } } };
+                  } else {
+                      const parsed = JSON.parse(responseText);
+                      data = parsed.data || { store: { appExtensions: { edges: [] } } };
+                  }
+              }
+          } catch (parseError) {
+              console.error('Failed to parse GraphQL response:', parseError);
+              console.error('Raw response:', await existingAppExtensions.text().catch(() => 'Could not read response'));
+              // Fallback to assuming no app extensions exist
+              data = { store: { appExtensions: { edges: [] } } };
+          }
+
+          const existingAppExtensionIds = data?.store?.appExtensions?.edges;
+
+          // Check if we already have our specific app extension installed
+          // Look for app extensions with our specific URL pattern
+          hasOurAppExtension = existingAppExtensionIds?.some((edge: any) => 
+              edge?.node?.url?.includes('/productAppExtension/')
+          );
+
+          // Cache the app extension result for 1 hour
+          appExtensionCache.set(cacheKey, {
+            hasExtension: hasOurAppExtension,
+            expiresAt: Date.now() + (60 * 60 * 1000) // 1 hour
+          });
         }
-
-        const existingAppExtensionIds = data?.store?.appExtensions?.edges;
-
-        // Check if we already have our specific app extension installed
-        // Look for app extensions with our specific URL pattern
-        const hasOurAppExtension = existingAppExtensionIds?.some((edge: any) => 
-            edge?.node?.url?.includes('/productAppExtension/')
-        );
-
-        // Removed caching to ensure webhook checks always run
 
         // Skip duplicate cleanup on every load - only create if needed
         if (!hasOurAppExtension) {
