@@ -240,7 +240,7 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
 
     // Only process updates that affect inventory-related fields to avoid unnecessary processing
     const inventoryFields = ['inventory_level', 'inventory_tracking', 'is_visible', 'availability'];
-    const hasInventoryChanges = inventoryFields.some(field => product.hasOwnProperty(field));
+    const hasInventoryChanges = inventoryFields.some(field => field in product);
     
     if (!hasInventoryChanges) {
       console.log(`[Product Update] No inventory-related changes detected, skipping bundle updates`);
