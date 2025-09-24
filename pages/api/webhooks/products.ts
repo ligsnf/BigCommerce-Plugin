@@ -35,7 +35,8 @@ function parseLinkedProduct(linkedProduct: any) {
 async function getBundleCategoryId(bc: any) {
   const { data: categories } = await bc.get('/catalog/categories?limit=250');
   const bundleCategory = categories.find((c: any) => String(c?.name || '').toLowerCase() === 'bundle');
-  return bundleCategory?.id;
+  
+return bundleCategory?.id;
 }
 
 // Helper function to update affected bundles when a product's inventory changes
@@ -46,7 +47,8 @@ async function updateAffectedBundles(productId: number, variantId: number | null
   const bundleCategoryId = await getBundleCategoryId(bc);
   if (!bundleCategoryId) {
     console.log(`[Product Update] No bundle category found, skipping bundle updates`);
-    return;
+    
+return;
   }
   
   // Get only products in the bundle category - MASSIVE performance improvement!
@@ -219,7 +221,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isFromApp = req.headers['x-bundle-app-update'] === 'true';
     if (isFromApp) {
       console.log('[Product Update] Skipping app-generated update to prevent loops');
-      return res.status(200).json({ message: 'Skipped app-generated update' });
+      
+return res.status(200).json({ message: 'Skipped app-generated update' });
     }
 
     const product = req.body.data;
@@ -241,7 +244,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (!hasInventoryChanges) {
       console.log(`[Product Update] No inventory-related changes detected, skipping bundle updates`);
-      return res.status(200).json({ message: 'No inventory changes to process' });
+      
+return res.status(200).json({ message: 'No inventory changes to process' });
     }
 
     // Get the access token for this store from the database
