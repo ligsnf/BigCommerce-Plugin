@@ -134,7 +134,8 @@ return match;
   
   console.log(`[Product Update] Found ${affectedBundles.length} product bundles and ${affectedVariantBundles.length} variant bundles to update`);
   
-  // Update product bundles
+  // Calculate inventory for all product bundles first
+  const productBundleUpdates = [];
   for (const bundle of affectedBundles) {
     let minPossibleBundles = Infinity;
     for (const linkedProduct of bundle.linkedProductIds) {
@@ -152,28 +153,38 @@ return match;
     }
     
     const newInventoryLevel = Math.max(0, minPossibleBundles);
+    productBundleUpdates.push({
+      id: bundle.id,
+      inventory_level: newInventoryLevel
+    });
     
-    // Update with header to prevent webhook loops
-    const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${bundle.id}`, {
+    console.log(`[Product Update] Calculated product bundle ${bundle.id} inventory: ${newInventoryLevel}`);
+  }
+
+  // Bulk update all product bundles in a single API call
+  if (productBundleUpdates.length > 0) {
+    console.log(`[Product Update] Bulk updating ${productBundleUpdates.length} product bundles`);
+    
+    const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products`, {
       method: 'PUT',
       headers: {
         'X-Auth-Token': accessToken,
         'Content-Type': 'application/json',
         'X-Bundle-App-Update': 'true' // Prevent webhook loops
       },
-      body: JSON.stringify({
-        inventory_level: newInventoryLevel
-      })
+      body: JSON.stringify(productBundleUpdates)
     });
     
     if (!response.ok) {
-      console.error(`[Product Update] Failed to update bundle ${bundle.id}: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[Product Update] Failed to bulk update product bundles: ${response.status} - ${errorText}`);
+    } else {
+      console.log(`[Product Update] Successfully bulk updated ${productBundleUpdates.length} product bundles`);
     }
-    
-    console.log(`[Product Update] Updated product bundle ${bundle.id} inventory to ${newInventoryLevel}`);
   }
 
-  // Update variant bundles
+  // Calculate inventory for all variant bundles and group by product
+  const variantUpdatesByProduct: Record<string, Array<{id: number, inventory_level: number}>> = {};
   for (const bundle of affectedVariantBundles) {
     let minPossibleBundles = Infinity;
     for (const linkedProduct of bundle.linkedProductIds) {
@@ -192,24 +203,38 @@ return match;
     
     const newInventoryLevel = Math.max(0, minPossibleBundles);
     
-    // Update with header to prevent webhook loops
-    const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${bundle.productId}/variants/${bundle.variantId}`, {
+    // Group variant updates by product ID for bulk operations
+    if (!variantUpdatesByProduct[bundle.productId]) {
+      variantUpdatesByProduct[bundle.productId] = [];
+    }
+    variantUpdatesByProduct[bundle.productId].push({
+      id: bundle.variantId,
+      inventory_level: newInventoryLevel
+    });
+    
+    console.log(`[Product Update] Calculated variant bundle ${bundle.productId}:${bundle.variantId} inventory: ${newInventoryLevel}`);
+  }
+
+  // Bulk update variant bundles (grouped by product)
+  for (const [productId, variantUpdates] of Object.entries(variantUpdatesByProduct)) {
+    console.log(`[Product Update] Bulk updating ${variantUpdates.length} variants for product ${productId}`);
+    
+    const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/variants`, {
       method: 'PUT',
       headers: {
         'X-Auth-Token': accessToken,
         'Content-Type': 'application/json',
         'X-Bundle-App-Update': 'true' // Prevent webhook loops
       },
-      body: JSON.stringify({
-        inventory_level: newInventoryLevel
-      })
+      body: JSON.stringify(variantUpdates)
     });
     
     if (!response.ok) {
-      console.error(`[Product Update] Failed to update variant bundle ${bundle.productId}:${bundle.variantId}: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[Product Update] Failed to bulk update variants for product ${productId}: ${response.status} - ${errorText}`);
+    } else {
+      console.log(`[Product Update] Successfully bulk updated ${variantUpdates.length} variants for product ${productId}`);
     }
-    
-    console.log(`[Product Update] Updated variant bundle ${bundle.productId}:${bundle.variantId} inventory to ${newInventoryLevel}`);
   }
 }
 
@@ -238,15 +263,6 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
     console.log(`[Product Update] Received ${scope} webhook for product ${product.id} in store ${storeHash}`);
     console.log(`[Product Update] Webhook payload:`, JSON.stringify(product, null, 2));
 
-    // Only process updates that affect inventory-related fields to avoid unnecessary processing
-    const inventoryFields = ['inventory_level', 'inventory_tracking', 'is_visible', 'availability'];
-    const hasInventoryChanges = inventoryFields.some(field => field in product);
-    
-    if (!hasInventoryChanges) {
-      console.log(`[Product Update] No inventory-related changes detected, skipping bundle updates`);
-      
-return res.status(200).json({ message: 'No inventory changes to process' });
-    }
 
     // Get the access token for this store from the database
     const accessToken = await db.getStoreToken(storeHash);
