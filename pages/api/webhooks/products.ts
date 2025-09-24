@@ -215,25 +215,32 @@ return match;
     console.log(`[Product Update] Calculated variant bundle ${bundle.productId}:${bundle.variantId} inventory: ${newInventoryLevel}`);
   }
 
-  // Bulk update variant bundles (grouped by product)
+  // Update variant bundles individually (BigCommerce doesn't support bulk variant updates)
   for (const [productId, variantUpdates] of Object.entries(variantUpdatesByProduct)) {
-    console.log(`[Product Update] Bulk updating ${variantUpdates.length} variants for product ${productId}`);
+    console.log(`[Product Update] Updating ${variantUpdates.length} variants for product ${productId}`);
     
-    const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/variants`, {
-      method: 'PUT',
-      headers: {
-        'X-Auth-Token': accessToken,
-        'Content-Type': 'application/json',
-        'X-Bundle-App-Update': 'true' // Prevent webhook loops
-      },
-      body: JSON.stringify(variantUpdates)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[Product Update] Failed to bulk update variants for product ${productId}: ${response.status} - ${errorText}`);
-    } else {
-      console.log(`[Product Update] Successfully bulk updated ${variantUpdates.length} variants for product ${productId}`);
+    // Update each variant individually
+    for (const variantUpdate of variantUpdates) {
+      try {
+        const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/variants/${variantUpdate.id}`, {
+          method: 'PUT',
+          headers: {
+            'X-Auth-Token': accessToken,
+            'Content-Type': 'application/json',
+            'X-Bundle-App-Update': 'true' // Prevent webhook loops
+          },
+          body: JSON.stringify({ inventory_level: variantUpdate.inventory_level })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[Product Update] Failed to update variant ${variantUpdate.id} for product ${productId}: ${response.status} - ${errorText}`);
+        } else {
+          console.log(`[Product Update] Successfully updated variant ${variantUpdate.id} inventory to ${variantUpdate.inventory_level}`);
+        }
+      } catch (error) {
+        console.error(`[Product Update] Error updating variant ${variantUpdate.id}:`, error);
+      }
     }
   }
 }
