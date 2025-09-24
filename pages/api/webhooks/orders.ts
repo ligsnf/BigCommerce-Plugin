@@ -84,38 +84,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const orderDetails = await orderProductsRes.json();
+    console.log(`[Order Webhook] Processing order ${orderId} with ${orderDetails.length} items`);
 
-    // Get all products that are bundles
-    const { data: allProducts } = await bc.get('/catalog/products');
+    // Get bundle category products only (much more efficient)
     const bundleProducts = [];
     const bundleVariants = [];
     
-    // Find all bundles and their details
-    for (const product of allProducts) {
-      // Check product-level metafields
-      const { isBundle: isProductBundle, linkedProductIds: productLinkedProductIds } = await getProductBundleInfo(product.id, bc);
+    try {
+      const { data: categories } = await bc.get('/catalog/categories?limit=250');
+      const bundleCategory = categories.find((c: any) => String(c?.name || '').toLowerCase() === 'bundle');
       
-      if (isProductBundle) {
-        bundleProducts.push({
-          id: product.id,
-          linkedProductIds: productLinkedProductIds
-        });
-      }
-
-      // Check variant-level metafields
-      const { data: variants } = await bc.get(`/catalog/products/${product.id}/variants`);
-      for (const variant of variants) {
-        const { isBundle: isVariantBundle, linkedProductIds: variantLinkedProductIds } = await getVariantBundleInfo(product.id, variant.id, bc);
+      if (bundleCategory) {
+        console.log(`[Order Webhook] Found bundle category: ${bundleCategory.id}`);
+        const { data: bundleCategoryProducts } = await bc.get(`/catalog/products?categories:in=${bundleCategory.id}`);
+        console.log(`[Order Webhook] Found ${bundleCategoryProducts.length} products in bundle category`);
         
-        if (isVariantBundle) {
-          bundleVariants.push({
-            productId: product.id,
-            variantId: variant.id,
-            linkedProductIds: variantLinkedProductIds
-          });
+        // Only check metafields for products in bundle category
+        for (const product of bundleCategoryProducts) {
+          // Check product-level metafields
+          const { isBundle: isProductBundle, linkedProductIds: productLinkedProductIds } = await getProductBundleInfo(product.id, bc);
+          
+          if (isProductBundle && productLinkedProductIds.length > 0) {
+            bundleProducts.push({
+              id: product.id,
+              linkedProductIds: productLinkedProductIds
+            });
+            console.log(`[Order Webhook] Found product bundle: ${product.id}`);
+          }
+
+          // Check variant-level metafields
+          const { data: variants } = await bc.get(`/catalog/products/${product.id}/variants`);
+          for (const variant of variants) {
+            const { isBundle: isVariantBundle, linkedProductIds: variantLinkedProductIds } = await getVariantBundleInfo(product.id, variant.id, bc);
+            
+            if (isVariantBundle && variantLinkedProductIds.length > 0) {
+              bundleVariants.push({
+                productId: product.id,
+                variantId: variant.id,
+                linkedProductIds: variantLinkedProductIds
+              });
+              console.log(`[Order Webhook] Found variant bundle: ${product.id}:${variant.id}`);
+            }
+          }
         }
+      } else {
+        console.log(`[Order Webhook] No bundle category found, will check ordered items individually`);
       }
+    } catch (error) {
+      console.warn(`[Order Webhook] Could not fetch bundle category, falling back to individual checks:`, error);
     }
+
+    // Collect all inventory updates to batch them
+    const inventoryUpdates = new Map<string, { productId: number, variantId: number | null, newLevel: number }>();
+    const bundleRecalculations = new Set<string>();
 
     // Process each ordered item
     for (const item of orderDetails) {
@@ -123,52 +144,171 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const variantId = item.variant_id;
       const orderedQuantity = item.quantity;
       
-      // Check if the ordered item is a variant bundle
+      console.log(`[Order Webhook] Processing item: Product ${productId}${variantId ? ` Variant ${variantId}` : ''} x${orderedQuantity}`);
+      
+      // Check if this ordered item is a known bundle
+      let isItemABundle = false;
+      
       if (variantId) {
-        const { isBundle: isVariantBundle, linkedProductIds: variantLinkedProductIds } = await getVariantBundleInfo(productId, variantId, bc);
-
-        if (isVariantBundle) {
-          if (variantLinkedProductIds) {
-            // Update stock for each product in the bundle
-            for (const linkedProduct of variantLinkedProductIds) {
-              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
-              const totalQuantity = orderedQuantity * quantity;
-              await updateInventory(targetProductId, targetVariantId, totalQuantity, bc);
-            }
-          }
-        } else {
-          // If the variant is not a bundle, check if the parent product is a bundle
-          const { isBundle: isProductBundle, linkedProductIds: productLinkedProductIds } = await getProductBundleInfo(productId, bc);
-
-          if (isProductBundle && productLinkedProductIds) {
-            // Update stock for each product in the parent product bundle
-            for (const linkedProduct of productLinkedProductIds) {
-              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
-              const totalQuantity = orderedQuantity * quantity;
-              await updateInventory(targetProductId, targetVariantId, totalQuantity, bc);
-            }
-          } else {
-            // Handle individual variant purchase - update affected bundles
-            await updateAffectedBundles(productId, orderedQuantity, bundleProducts, bundleVariants, bc);
+        // Check if this variant is a bundle
+        const variantBundle = bundleVariants.find(b => b.productId === productId && b.variantId === variantId);
+        if (variantBundle) {
+          console.log(`[Order Webhook] Ordered item is a variant bundle: ${productId}:${variantId}`);
+          isItemABundle = true;
+          
+          // Deduct stock from each component in the bundle
+          for (const linkedProduct of variantBundle.linkedProductIds) {
+            const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
+            const totalQuantity = orderedQuantity * quantity;
+            
+            const key = targetVariantId ? `${targetProductId}:${targetVariantId}` : `${targetProductId}`;
+            const current = inventoryUpdates.get(key);
+            const newDeduction = (current?.newLevel || 0) + totalQuantity;
+            
+            inventoryUpdates.set(key, {
+              productId: targetProductId,
+              variantId: targetVariantId,
+              newLevel: newDeduction
+            });
+            
+            console.log(`[Order Webhook] Will deduct ${totalQuantity} from ${key}`);
           }
         }
-      } else {
-        // Check if the ordered item is a product bundle
-        const { isBundle: isProductBundle, linkedProductIds: productLinkedProductIds } = await getProductBundleInfo(productId, bc);
+      }
+      
+      if (!isItemABundle) {
+        // Check if the parent product is a bundle
+        const productBundle = bundleProducts.find(b => b.id === productId);
+        if (productBundle) {
+          console.log(`[Order Webhook] Ordered item is a product bundle: ${productId}`);
+          isItemABundle = true;
+          
+          // Deduct stock from each component in the bundle
+          for (const linkedProduct of productBundle.linkedProductIds) {
+            const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
+            const totalQuantity = orderedQuantity * quantity;
+            
+            const key = targetVariantId ? `${targetProductId}:${targetVariantId}` : `${targetProductId}`;
+            const current = inventoryUpdates.get(key);
+            const newDeduction = (current?.newLevel || 0) + totalQuantity;
+            
+            inventoryUpdates.set(key, {
+              productId: targetProductId,
+              variantId: targetVariantId,
+              newLevel: newDeduction
+            });
+            
+            console.log(`[Order Webhook] Will deduct ${totalQuantity} from ${key}`);
+          }
+        }
+      }
+      
+      if (!isItemABundle) {
+        // Individual item purchased - mark bundles containing this item for recalculation
+        console.log(`[Order Webhook] Individual item purchased: ${productId}${variantId ? `:${variantId}` : ''}`);
         
-        if (isProductBundle) {
-          if (productLinkedProductIds) {
-            // Update stock for each product in the bundle
-            for (const linkedProduct of productLinkedProductIds) {
-              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
-              const totalQuantity = orderedQuantity * quantity;
-              await updateInventory(targetProductId, targetVariantId, totalQuantity, bc);
-            }
+        // Find bundles that contain this product/variant
+        for (const bundle of bundleProducts) {
+          const containsItem = bundle.linkedProductIds.some((linked: any) => {
+            const targetProductId = typeof linked === 'object' ? linked.productId : linked;
+            const targetVariantId = typeof linked === 'object' ? linked.variantId : null;
+            return targetProductId === productId && (!variantId || targetVariantId === variantId);
+          });
+          
+          if (containsItem) {
+            bundleRecalculations.add(`product:${bundle.id}`);
+            console.log(`[Order Webhook] Bundle ${bundle.id} needs recalculation`);
           }
-        } else {
-          // Handle individual product purchase - update affected bundles
-          await updateAffectedBundles(productId, orderedQuantity, bundleProducts, bundleVariants, bc);
         }
+        
+        for (const bundle of bundleVariants) {
+          const containsItem = bundle.linkedProductIds.some((linked: any) => {
+            const targetProductId = typeof linked === 'object' ? linked.productId : linked;
+            const targetVariantId = typeof linked === 'object' ? linked.variantId : null;
+            return targetProductId === productId && (!variantId || targetVariantId === variantId);
+          });
+          
+          if (containsItem) {
+            bundleRecalculations.add(`variant:${bundle.productId}:${bundle.variantId}`);
+            console.log(`[Order Webhook] Variant bundle ${bundle.productId}:${bundle.variantId} needs recalculation`);
+          }
+        }
+      }
+    }
+
+    // Apply inventory deductions
+    console.log(`[Order Webhook] Applying ${inventoryUpdates.size} inventory updates`);
+    for (const [key, update] of Array.from(inventoryUpdates)) {
+      try {
+        if (update.variantId) {
+          const { data: variant } = await bc.get(`/catalog/products/${update.productId}/variants/${update.variantId}`);
+          const newStock = Math.max(0, variant.inventory_level - update.newLevel);
+          await bc.put(`/catalog/products/${update.productId}/variants/${update.variantId}`, { inventory_level: newStock });
+          console.log(`[Order Webhook] Updated variant ${update.productId}:${update.variantId} inventory: ${variant.inventory_level} → ${newStock}`);
+        } else {
+          const { data: product } = await bc.get(`/catalog/products/${update.productId}`);
+          const newStock = Math.max(0, product.inventory_level - update.newLevel);
+          await bc.put(`/catalog/products/${update.productId}`, { inventory_level: newStock });
+          console.log(`[Order Webhook] Updated product ${update.productId} inventory: ${product.inventory_level} → ${newStock}`);
+        }
+      } catch (error) {
+        console.error(`[Order Webhook] Failed to update inventory for ${key}:`, error);
+      }
+    }
+
+    // Recalculate affected bundles
+    console.log(`[Order Webhook] Recalculating ${bundleRecalculations.size} affected bundles`);
+    for (const bundleKey of Array.from(bundleRecalculations)) {
+      try {
+        if (bundleKey.startsWith('product:')) {
+          const bundleId = parseInt(bundleKey.split(':')[1]);
+          const bundle = bundleProducts.find(b => b.id === bundleId);
+          if (bundle) {
+            let minPossibleBundles = Infinity;
+            for (const linkedProduct of bundle.linkedProductIds) {
+              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
+              
+              if (targetVariantId) {
+                const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
+                const possibleBundles = Math.floor(linkedVariant.inventory_level / quantity);
+                minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
+              } else {
+                const { data: linkedProductObj } = await bc.get(`/catalog/products/${targetProductId}`);
+                const possibleBundles = Math.floor(linkedProductObj.inventory_level / quantity);
+                minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
+              }
+            }
+            
+            const newInventoryLevel = Math.max(0, minPossibleBundles);
+            await bc.put(`/catalog/products/${bundleId}`, { inventory_level: newInventoryLevel });
+            console.log(`[Order Webhook] Updated bundle ${bundleId} inventory to ${newInventoryLevel}`);
+          }
+        } else if (bundleKey.startsWith('variant:')) {
+          const [, bundleProductId, bundleVariantId] = bundleKey.split(':');
+          const bundle = bundleVariants.find(b => b.productId === parseInt(bundleProductId) && b.variantId === parseInt(bundleVariantId));
+          if (bundle) {
+            let minPossibleBundles = Infinity;
+            for (const linkedProduct of bundle.linkedProductIds) {
+              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
+              
+              if (targetVariantId) {
+                const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
+                const possibleBundles = Math.floor(linkedVariant.inventory_level / quantity);
+                minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
+              } else {
+                const { data: linkedProductObj } = await bc.get(`/catalog/products/${targetProductId}`);
+                const possibleBundles = Math.floor(linkedProductObj.inventory_level / quantity);
+                minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
+              }
+            }
+            
+            const newInventoryLevel = Math.max(0, minPossibleBundles);
+            await bc.put(`/catalog/products/${bundleProductId}/variants/${bundleVariantId}`, { inventory_level: newInventoryLevel });
+            console.log(`[Order Webhook] Updated variant bundle ${bundleProductId}:${bundleVariantId} inventory to ${newInventoryLevel}`);
+          }
+        }
+      } catch (error) {
+        console.error(`[Order Webhook] Failed to recalculate bundle ${bundleKey}:`, error);
       }
     }
 
