@@ -37,6 +37,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') return res.status(405).end('Method Not Allowed');
 
   try {
+    // Prevent webhook loops - skip if this update was triggered by our app
+    const isFromApp = req.headers['x-bundle-app-update'] === 'true';
+    if (isFromApp) {
+      console.log('[Order Webhook] Skipping app-generated update to prevent loops');
+      
+return res.status(200).json({ message: 'Skipped app-generated update' });
+    }
+
     const order = req.body.data;
     // Extract store hash from producer field (format: "stores/7wt5mizwwn")
     const storeHash = req.body.producer?.split('/')[1];
@@ -231,13 +239,41 @@ return targetProductId === productId && (!variantId || targetVariantId === varia
         if (update.variantId) {
           const { data: variant } = await bc.get(`/catalog/products/${update.productId}/variants/${update.variantId}`);
           const newStock = Math.max(0, variant.inventory_level - update.newLevel);
-          await bc.put(`/catalog/products/${update.productId}/variants/${update.variantId}`, { inventory_level: newStock });
-          console.log(`[Order Webhook] Updated variant ${update.productId}:${update.variantId} inventory: ${variant.inventory_level} → ${newStock}`);
+          
+          const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${update.productId}/variants/${update.variantId}`, {
+            method: 'PUT',
+            headers: {
+              'X-Auth-Token': accessToken,
+              'Content-Type': 'application/json',
+              'X-Bundle-App-Update': 'true' // Prevent webhook loops
+            },
+            body: JSON.stringify({ inventory_level: newStock })
+          });
+          
+          if (response.ok) {
+            console.log(`[Order Webhook] Updated variant ${update.productId}:${update.variantId} inventory: ${variant.inventory_level} → ${newStock}`);
+          } else {
+            console.error(`[Order Webhook] Failed to update variant ${update.productId}:${update.variantId}: ${response.status}`);
+          }
         } else {
           const { data: product } = await bc.get(`/catalog/products/${update.productId}`);
           const newStock = Math.max(0, product.inventory_level - update.newLevel);
-          await bc.put(`/catalog/products/${update.productId}`, { inventory_level: newStock });
-          console.log(`[Order Webhook] Updated product ${update.productId} inventory: ${product.inventory_level} → ${newStock}`);
+          
+          const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products`, {
+            method: 'PUT',
+            headers: {
+              'X-Auth-Token': accessToken,
+              'Content-Type': 'application/json',
+              'X-Bundle-App-Update': 'true' // Prevent webhook loops
+            },
+            body: JSON.stringify([{ id: update.productId, inventory_level: newStock }])
+          });
+          
+          if (response.ok) {
+            console.log(`[Order Webhook] Updated product ${update.productId} inventory: ${product.inventory_level} → ${newStock}`);
+          } else {
+            console.error(`[Order Webhook] Failed to update product ${update.productId}: ${response.status}`);
+          }
         }
       } catch (error) {
         console.error(`[Order Webhook] Failed to update inventory for ${key}:`, error);
@@ -268,8 +304,22 @@ return targetProductId === productId && (!variantId || targetVariantId === varia
             }
             
             const newInventoryLevel = Math.max(0, minPossibleBundles);
-            await bc.put(`/catalog/products/${bundleId}`, { inventory_level: newInventoryLevel });
-            console.log(`[Order Webhook] Updated bundle ${bundleId} inventory to ${newInventoryLevel}`);
+            
+            const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products`, {
+              method: 'PUT',
+              headers: {
+                'X-Auth-Token': accessToken,
+                'Content-Type': 'application/json',
+                'X-Bundle-App-Update': 'true' // Prevent webhook loops
+              },
+              body: JSON.stringify([{ id: bundleId, inventory_level: newInventoryLevel }])
+            });
+            
+            if (response.ok) {
+              console.log(`[Order Webhook] Updated bundle ${bundleId} inventory to ${newInventoryLevel}`);
+            } else {
+              console.error(`[Order Webhook] Failed to update bundle ${bundleId}: ${response.status}`);
+            }
           }
         } else if (bundleKey.startsWith('variant:')) {
           const [, bundleProductId, bundleVariantId] = bundleKey.split(':');
@@ -291,8 +341,22 @@ return targetProductId === productId && (!variantId || targetVariantId === varia
             }
             
             const newInventoryLevel = Math.max(0, minPossibleBundles);
-            await bc.put(`/catalog/products/${bundleProductId}/variants/${bundleVariantId}`, { inventory_level: newInventoryLevel });
-            console.log(`[Order Webhook] Updated variant bundle ${bundleProductId}:${bundleVariantId} inventory to ${newInventoryLevel}`);
+            
+            const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${bundleProductId}/variants/${bundleVariantId}`, {
+              method: 'PUT',
+              headers: {
+                'X-Auth-Token': accessToken,
+                'Content-Type': 'application/json',
+                'X-Bundle-App-Update': 'true' // Prevent webhook loops
+              },
+              body: JSON.stringify({ inventory_level: newInventoryLevel })
+            });
+            
+            if (response.ok) {
+              console.log(`[Order Webhook] Updated variant bundle ${bundleProductId}:${bundleVariantId} inventory to ${newInventoryLevel}`);
+            } else {
+              console.error(`[Order Webhook] Failed to update variant bundle ${bundleProductId}:${bundleVariantId}: ${response.status}`);
+            }
           }
         }
       } catch (error) {
