@@ -32,20 +32,6 @@ function parseLinkedProduct(linkedProduct: any) {
   };
 }
 
-// Utility to update inventory for a product or variant
-async function updateInventory(targetProductId: number, targetVariantId: number | null, totalQuantity: number, bc: any) {
-  if (targetVariantId) {
-    const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
-    const newStock = Math.max(0, linkedVariant.inventory_level - totalQuantity);
-
-    return await bc.put(`/catalog/products/${targetProductId}/variants/${targetVariantId}`, { inventory_level: newStock });
-  } else {
-    const { data: linkedProduct } = await bc.get(`/catalog/products/${targetProductId}`);
-    const newStock = Math.max(0, linkedProduct.inventory_level - totalQuantity);
-
-    return await bc.put(`/catalog/products/${targetProductId}`, { inventory_level: newStock });
-  }
-}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end('Method Not Allowed');
@@ -212,7 +198,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const containsItem = bundle.linkedProductIds.some((linked: any) => {
             const targetProductId = typeof linked === 'object' ? linked.productId : linked;
             const targetVariantId = typeof linked === 'object' ? linked.variantId : null;
-            return targetProductId === productId && (!variantId || targetVariantId === variantId);
+            
+return targetProductId === productId && (!variantId || targetVariantId === variantId);
           });
           
           if (containsItem) {
@@ -225,7 +212,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const containsItem = bundle.linkedProductIds.some((linked: any) => {
             const targetProductId = typeof linked === 'object' ? linked.productId : linked;
             const targetVariantId = typeof linked === 'object' ? linked.variantId : null;
-            return targetProductId === productId && (!variantId || targetVariantId === variantId);
+            
+return targetProductId === productId && (!variantId || targetVariantId === variantId);
           });
           
           if (containsItem) {
@@ -317,69 +305,3 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(500).json({ message: 'Internal Server Error', error: err.message });
   }
 }
-
-// Helper function to update affected bundles
-async function updateAffectedBundles(productId: number, orderedQuantity: number, bundleProducts: any[], bundleVariants: any[], bc: any) {
-  // Find and update all product bundles that contain this product
-  const affectedBundles = bundleProducts.filter(bundle => 
-    bundle.linkedProductIds.some((linkedProduct: any) => {
-      const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
-
-      return targetProductId === productId;
-    })
-  );
-  
-  // Find and update all variant bundles that contain this product
-  const affectedVariantBundles = bundleVariants.filter(bundle => 
-    bundle.linkedProductIds.some((linkedProduct: any) => {
-      const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
-
-      return targetProductId === productId;
-    })
-  );
-  
-  // Update product bundles
-  for (const bundle of affectedBundles) {
-    let minPossibleBundles = Infinity;
-    for (const linkedProduct of bundle.linkedProductIds) {
-      const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
-      const targetVariantId = typeof linkedProduct === 'object' ? linkedProduct.variantId : null;
-      const quantityNeeded = typeof linkedProduct === 'object' ? linkedProduct.quantity : 1;
-      if (targetVariantId) {
-        const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
-        const possibleBundles = Math.floor(linkedVariant.inventory_level / quantityNeeded);
-        minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-      } else {
-        const { data: linkedProductObj } = await bc.get(`/catalog/products/${targetProductId}`);
-        const possibleBundles = Math.floor(linkedProductObj.inventory_level / quantityNeeded);
-        minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-      }
-    }
-    await bc.put(`/catalog/products/${bundle.id}`, {
-      inventory_level: minPossibleBundles
-    });
-  }
-
-  // Update variant bundles
-  for (const bundle of affectedVariantBundles) {
-    let minPossibleBundles = Infinity;
-    for (const linkedProduct of bundle.linkedProductIds) {
-      const targetProductId = typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct;
-      const targetVariantId = typeof linkedProduct === 'object' ? linkedProduct.variantId : null;
-      const quantityNeeded = typeof linkedProduct === 'object' ? linkedProduct.quantity : 1;
-      if (targetVariantId) {
-        const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
-        const possibleBundles = Math.floor(linkedVariant.inventory_level / quantityNeeded);
-        minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-      } else {
-        const { data: linkedProductObj } = await bc.get(`/catalog/products/${targetProductId}`);
-        const possibleBundles = Math.floor(linkedProductObj.inventory_level / quantityNeeded);
-        minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-      }
-    }
-    await bc.put(`/catalog/products/${bundle.productId}/variants/${bundle.variantId}`, {
-      inventory_level: minPossibleBundles
-    });
-  }
-}
-// TODO: Add a function to update inventory when a product is deleted from bigcommerce
