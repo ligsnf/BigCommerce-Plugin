@@ -76,9 +76,20 @@ const ProductAppExtension = () => {
 
   // Format available products for react-select (main products only)
   const products = list
-    .filter(({ id }) => {
+    .filter(({ id, variants, inventory_tracking }) => {
       if (id === productId) return false;
       if (bundleProductIds.has(id)) return false;
+      
+      // Filter out products with variants that use product-level tracking
+      const hasMultipleVariants = variants && variants.length > 1;
+      if (hasMultipleVariants && inventory_tracking !== "variant") {
+        return false;
+      }
+      
+      // Filter out products with no inventory tracking
+      if (inventory_tracking === "none") {
+        return false;
+      }
 
       return true;
     })
@@ -134,6 +145,7 @@ const ProductAppExtension = () => {
     const product = products.find(p => p.value === selectedItem.productId);
     if (!product) return;
 
+    // Since products are pre-filtered, we only need basic validation here
     const hasMultipleVariants = product.variants && product.variants.length > 1;
     const hasInventoryTracking = selectedItem.isMainProduct
       ? product.inventory_tracking === "product"
@@ -142,20 +154,6 @@ const ProductAppExtension = () => {
     if (!hasInventoryTracking) {
       alertsManager.add({
         messages: [{ text: 'This product/variant cannot be added because inventory tracking is disabled.' }],
-        type: 'error',
-        onClose: () => null,
-      });
-      setSelectedItem(null);
-
-      return;
-    }
-
-    // NEW: Check if product has variants but uses product-level tracking
-    if (hasMultipleVariants && product.inventory_tracking !== "variant") {
-      alertsManager.add({
-        messages: [{ 
-          text: `Cannot add "${product.label}": This product has variants but uses product-level inventory tracking. Please change it to "Track inventory by options" in the product settings for bundle calculations to work correctly.` 
-        }],
         type: 'error',
         onClose: () => null,
       });
