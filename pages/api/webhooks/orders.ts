@@ -32,24 +32,56 @@ function parseLinkedProduct(linkedProduct: any) {
   };
 }
 
-// Calculate deltas between original and current order items
-async function calculateOrderDeltas(orderId: number, currentItems: any[]) {
-  console.log('[Order Webhook] Calculating order deltas for bare minimum implementation');
+// Check if order is newly created by comparing date_created and date_modified
+async function checkIfNewOrder(orderId: number, storeHash: string, accessToken: string) {
+  try {
+    const orderResponse = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${orderId}`, {
+      method: 'GET',
+      headers: {
+        'X-Auth-Token': accessToken,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!orderResponse.ok) {
+      console.warn('[Order Webhook] Could not fetch order details, assuming new order');
+      return true; // Default to treating as new order if we can't check
+    }
+
+    const orderData = await orderResponse.json();
+    const dateCreated = new Date(orderData.date_created);
+    const dateModified = new Date(orderData.date_modified);
+    
+    // If date_created and date_modified are very close (within 30 seconds), it's likely a new order
+    const timeDiffSeconds = Math.abs(dateModified.getTime() - dateCreated.getTime()) / 1000;
+    const isNewOrder = timeDiffSeconds <= 30;
+    
+    console.log(`[Order Webhook] Order ${orderId} - created: ${dateCreated.toISOString()}, modified: ${dateModified.toISOString()}, diff: ${timeDiffSeconds}s, treating as ${isNewOrder ? 'new order' : 'edit'}`);
+    
+    return isNewOrder;
+  } catch (error) {
+    console.warn('[Order Webhook] Error checking order timestamps, assuming new order:', error);
+    return true; // Default to treating as new order on error
+  }
+}
+
+// Calculate deltas between original and current order items for order updates
+async function calculateOrderDeltas(orderId: number, currentItems: any[], storeHash: string, accessToken: string) {
+  console.log('[Order Webhook] Calculating order deltas for order update');
   
-  // Bare minimum approach: 
-  // For order updates, we'll process the current order state and let the recalculation logic handle it
-  // This avoids complex delta calculation but still updates bundles correctly
+  // TODO: Implement proper delta calculation
+  // For now, use bare minimum approach - process current order state
+  // This is a placeholder for future enhancement when we need proper delta logic
   
   const deltaItems = currentItems.map(item => ({
     ...item,
     quantity: item.quantity // Use current quantities
   }));
   
-  console.log(`[Order Webhook] Processing ${deltaItems.length} items from updated order`);
+  console.log(`[Order Webhook] Processing ${deltaItems.length} items from updated order (bare minimum delta)`);
   
   return deltaItems;
 }
-
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end('Method Not Allowed');
@@ -87,11 +119,12 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
     // Only process store/order/updated events (handles both new orders and edits)
     if (scope !== 'store/order/updated') {
       console.log(`[Order Webhook] Ignoring ${scope} - only processing store/order/updated`);
-      
-return res.status(200).json({ message: 'Webhook scope not handled' });
+      return res.status(200).json({ message: 'Webhook scope not handled' });
     }
 
-    console.log(`[Order Webhook] Processing order update/creation: ${orderId}`);
+    // Check if this is a new order or an edit by comparing timestamps
+    const isNewOrder = await checkIfNewOrder(orderId, storeHash, accessToken);
+    console.log(`[Order Webhook] Processing ${isNewOrder ? 'new order' : 'order update'}: ${orderId}`);
 
     // Fetch order products using V2 API manually
     const orderProductsRes = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${orderId}/products`, {
@@ -109,11 +142,16 @@ return res.status(200).json({ message: 'Webhook scope not handled' });
 
     const currentOrderItems = await orderProductsRes.json();
 
-    // For order updates, we need to calculate deltas
+    // Handle new orders vs order updates differently
     let itemsToProcess = currentOrderItems;
-    if (scope === 'store/order/updated') {
+    
+    if (isNewOrder) {
+      // For new orders, process all items as-is (no deltas needed)
+      console.log('[Order Webhook] Processing new order - using full order data');
+    } else {
+      // For order updates, calculate deltas to handle edits properly
       console.log('[Order Webhook] Processing order update - calculating deltas');
-      itemsToProcess = await calculateOrderDeltas(orderId, currentOrderItems);
+      itemsToProcess = await calculateOrderDeltas(orderId, currentOrderItems, storeHash, accessToken);
     }
 
     console.log(`[Order Webhook] Processing order ${orderId} with ${itemsToProcess.length} items`);
