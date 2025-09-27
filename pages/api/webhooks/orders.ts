@@ -33,7 +33,7 @@ function parseLinkedProduct(linkedProduct: any) {
 }
 
 // Calculate deltas between original and current order items
-async function calculateOrderDeltas(orderId: number, currentItems: any[], storeHash: string, accessToken: string) {
+async function calculateOrderDeltas(orderId: number, currentItems: any[]) {
   console.log('[Order Webhook] Calculating order deltas for bare minimum implementation');
   
   // Bare minimum approach: 
@@ -46,6 +46,7 @@ async function calculateOrderDeltas(orderId: number, currentItems: any[], storeH
   }));
   
   console.log(`[Order Webhook] Processing ${deltaItems.length} items from updated order`);
+  
   return deltaItems;
 }
 
@@ -103,7 +104,7 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
     let itemsToProcess = currentOrderItems;
     if (scope === 'store/order/updated') {
       console.log('[Order Webhook] Processing order update - calculating deltas');
-      itemsToProcess = await calculateOrderDeltas(orderId, currentOrderItems, storeHash, accessToken);
+      itemsToProcess = await calculateOrderDeltas(orderId, currentOrderItems);
     }
 
     console.log(`[Order Webhook] Processing order ${orderId} with ${itemsToProcess.length} items`);
