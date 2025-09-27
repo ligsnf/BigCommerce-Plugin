@@ -30,9 +30,9 @@ export async function ensureWebhookExists({ accessToken, storeHash, appUrl }: Cr
     // Define required webhooks
     const requiredWebhooks = [
       {
-        scope: 'store/order/created',
+        scope: 'store/order/updated',
         destination: `${baseUrl}/api/webhooks/orders`,
-        description: 'Order created webhook for bundle inventory management'
+        description: 'Order updated webhook for bundle inventory management (handles both new orders and edits)'
       },
       {
         scope: 'store/product/updated',

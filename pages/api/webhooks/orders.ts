@@ -84,6 +84,14 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
 
     console.log(`[Order Webhook] Received ${scope} for order ${orderId}`);
 
+    // Only process store/order/updated events (handles both new orders and edits)
+    if (scope !== 'store/order/updated') {
+      console.log(`[Order Webhook] Ignoring ${scope} - only processing store/order/updated`);
+      return res.status(200).json({ message: 'Webhook scope not handled' });
+    }
+
+    console.log(`[Order Webhook] Processing order update/creation: ${orderId}`);
+
     // Fetch order products using V2 API manually
     const orderProductsRes = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${orderId}/products`, {
       method: 'GET',
@@ -124,28 +132,28 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
         
         // Only check metafields for products in bundle category
         for (const product of bundleCategoryProducts) {
-          // Check product-level metafields
-          const { isBundle: isProductBundle, linkedProductIds: productLinkedProductIds } = await getProductBundleInfo(product.id, bc);
-          
+      // Check product-level metafields
+      const { isBundle: isProductBundle, linkedProductIds: productLinkedProductIds } = await getProductBundleInfo(product.id, bc);
+      
           if (isProductBundle && productLinkedProductIds.length > 0) {
-            bundleProducts.push({
-              id: product.id,
-              linkedProductIds: productLinkedProductIds
-            });
+        bundleProducts.push({
+          id: product.id,
+          linkedProductIds: productLinkedProductIds
+        });
             console.log(`[Order Webhook] Found product bundle: ${product.id}`);
-          }
+      }
 
-          // Check variant-level metafields
-          const { data: variants } = await bc.get(`/catalog/products/${product.id}/variants`);
-          for (const variant of variants) {
-            const { isBundle: isVariantBundle, linkedProductIds: variantLinkedProductIds } = await getVariantBundleInfo(product.id, variant.id, bc);
-            
+      // Check variant-level metafields
+      const { data: variants } = await bc.get(`/catalog/products/${product.id}/variants`);
+      for (const variant of variants) {
+        const { isBundle: isVariantBundle, linkedProductIds: variantLinkedProductIds } = await getVariantBundleInfo(product.id, variant.id, bc);
+        
             if (isVariantBundle && variantLinkedProductIds.length > 0) {
-              bundleVariants.push({
-                productId: product.id,
-                variantId: variant.id,
-                linkedProductIds: variantLinkedProductIds
-              });
+          bundleVariants.push({
+            productId: product.id,
+            variantId: variant.id,
+            linkedProductIds: variantLinkedProductIds
+          });
               console.log(`[Order Webhook] Found variant bundle: ${product.id}:${variant.id}`);
             }
           }
@@ -208,8 +216,8 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
           
           // Deduct stock from each component in the bundle
           for (const linkedProduct of productBundle.linkedProductIds) {
-            const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
-            const totalQuantity = orderedQuantity * quantity;
+              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
+              const totalQuantity = orderedQuantity * quantity;
             
             const key = targetVariantId ? `${targetProductId}:${targetVariantId}` : `${targetProductId}`;
             const current = inventoryUpdates.get(key);
@@ -346,7 +354,7 @@ return targetProductId === productId && (!variantId || targetVariantId === varia
             
             if (response.ok) {
               console.log(`[Order Webhook] Updated bundle ${bundleId} inventory to ${newInventoryLevel}`);
-            } else {
+          } else {
               console.error(`[Order Webhook] Failed to update bundle ${bundleId}: ${response.status}`);
             }
           }
