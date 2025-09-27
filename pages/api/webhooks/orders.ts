@@ -87,7 +87,8 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
     // Only process store/order/updated events (handles both new orders and edits)
     if (scope !== 'store/order/updated') {
       console.log(`[Order Webhook] Ignoring ${scope} - only processing store/order/updated`);
-      return res.status(200).json({ message: 'Webhook scope not handled' });
+      
+return res.status(200).json({ message: 'Webhook scope not handled' });
     }
 
     console.log(`[Order Webhook] Processing order update/creation: ${orderId}`);
