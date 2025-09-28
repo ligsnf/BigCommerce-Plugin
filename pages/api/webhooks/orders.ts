@@ -1,5 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { bigcommerceClient } from '../../../lib/auth';
+import { 
+  parseLinkedProduct, 
+  recalculateBundlesFromKeys 
+} from '../../../lib/bundle-calculator';
 import db from '../../../lib/db';
 
 // Utility to get bundle info for a product
@@ -22,15 +26,7 @@ async function getVariantBundleInfo(productId: number, variantId: number, bc: an
   return { isBundle, linkedProductIds };
 }
 
-// Utility to parse linked product info
-function parseLinkedProduct(linkedProduct: any) {
-
-  return {
-    productId: typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct,
-    variantId: typeof linkedProduct === 'object' ? linkedProduct.variantId : null,
-    quantity: typeof linkedProduct === 'object' ? linkedProduct.quantity : 1,
-  };
-}
+// parseLinkedProduct function moved to lib/bundle-calculator.ts
 
 // Check if order is newly created by comparing date_created and date_modified
 async function checkIfNewOrder(orderId: number, storeHash: string, accessToken: string) {
@@ -45,42 +41,67 @@ async function checkIfNewOrder(orderId: number, storeHash: string, accessToken: 
 
     if (!orderResponse.ok) {
       console.warn('[Order Webhook] Could not fetch order details, assuming new order');
-      return true; // Default to treating as new order if we can't check
+      
+return true; // Default to treating as new order if we can't check
     }
 
     const orderData = await orderResponse.json();
-    const dateCreated = new Date(orderData.date_created);
-    const dateModified = new Date(orderData.date_modified);
+    const dateCreated = orderData.date_created;
+    const dateModified = orderData.date_modified;
     
-    // If date_created and date_modified are very close (within 30 seconds), it's likely a new order
-    const timeDiffSeconds = Math.abs(dateModified.getTime() - dateCreated.getTime()) / 1000;
-    const isNewOrder = timeDiffSeconds <= 30;
+    // If date_created and date_modified are identical, it's a new order
+    // If they're different, the order was modified after creation
+    const isNewOrder = dateCreated === dateModified;
     
-    console.log(`[Order Webhook] Order ${orderId} - created: ${dateCreated.toISOString()}, modified: ${dateModified.toISOString()}, diff: ${timeDiffSeconds}s, treating as ${isNewOrder ? 'new order' : 'edit'}`);
+    console.log(`[Order Webhook] Order ${orderId} - created: ${dateCreated}, modified: ${dateModified}, treating as ${isNewOrder ? 'new order' : 'edit'}`);
     
     return isNewOrder;
   } catch (error) {
     console.warn('[Order Webhook] Error checking order timestamps, assuming new order:', error);
-    return true; // Default to treating as new order on error
+    
+return true; // Default to treating as new order on error
   }
 }
 
 // Calculate deltas between original and current order items for order updates
-async function calculateOrderDeltas(orderId: number, currentItems: any[], storeHash: string, accessToken: string) {
+async function calculateOrderDeltas(orderId: number, currentItems: any[]) {
   console.log('[Order Webhook] Calculating order deltas for order update');
   
-  // TODO: Implement proper delta calculation
-  // For now, use bare minimum approach - process current order state
-  // This is a placeholder for future enhancement when we need proper delta logic
-  
-  const deltaItems = currentItems.map(item => ({
-    ...item,
-    quantity: item.quantity // Use current quantities
-  }));
-  
-  console.log(`[Order Webhook] Processing ${deltaItems.length} items from updated order (bare minimum delta)`);
-  
-  return deltaItems;
+  try {
+    // For order updates, we don't need to handle individual item stock changes
+    // BigCommerce automatically handles those. We only need to:
+    // 1. Find bundles that were in the order and recalculate their stock
+    // 2. Find bundles that contain updated items and recalculate their stock
+    
+    // Return empty array since BigCommerce handles individual item stock automatically
+    // The main logic will still process bundle recalculations based on current order state
+    console.log('[Order Webhook] Order update detected - BigCommerce handles individual item stock automatically');
+    console.log('[Order Webhook] Will recalculate bundle stock based on current order state');
+    
+    // Return items with zero quantity change since BigCommerce already handled the stock
+    // This ensures we only trigger bundle recalculations, not individual stock deductions
+    const deltaItems = currentItems.map(item => ({
+      ...item,
+      quantity: 0, // Zero delta - BigCommerce already handled the stock change
+      originalQuantity: item.quantity, // Keep original for bundle calculations
+      isOrderUpdate: true // Flag to indicate this is from an order update
+    }));
+    
+    console.log(`[Order Webhook] Prepared ${deltaItems.length} items for bundle recalculation (no stock deductions)`);
+    
+    return deltaItems;
+    
+  } catch (error) {
+    console.error('[Order Webhook] Error calculating order deltas:', error);
+    
+    // Fallback: return items with zero quantities to avoid double stock deduction
+    return currentItems.map(item => ({
+      ...item,
+      quantity: 0,
+      originalQuantity: item.quantity,
+      isOrderUpdate: true
+    }));
+  }
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -119,7 +140,8 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
     // Only process store/order/updated events (handles both new orders and edits)
     if (scope !== 'store/order/updated') {
       console.log(`[Order Webhook] Ignoring ${scope} - only processing store/order/updated`);
-      return res.status(200).json({ message: 'Webhook scope not handled' });
+      
+return res.status(200).json({ message: 'Webhook scope not handled' });
     }
 
     // Check if this is a new order or an edit by comparing timestamps
@@ -151,7 +173,7 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
     } else {
       // For order updates, calculate deltas to handle edits properly
       console.log('[Order Webhook] Processing order update - calculating deltas');
-      itemsToProcess = await calculateOrderDeltas(orderId, currentOrderItems, storeHash, accessToken);
+      itemsToProcess = await calculateOrderDeltas(orderId, currentOrderItems);
     }
 
     console.log(`[Order Webhook] Processing order ${orderId} with ${itemsToProcess.length} items`);
@@ -213,8 +235,14 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
       const productId = item.product_id;
       const variantId = item.variant_id;
       const orderedQuantity = item.quantity;
+      const isOrderUpdate = item.isOrderUpdate || false;
       
-      console.log(`[Order Webhook] Processing item: Product ${productId}${variantId ? ` Variant ${variantId}` : ''} x${orderedQuantity}`);
+      console.log(`[Order Webhook] Processing item: Product ${productId}${variantId ? ` Variant ${variantId}` : ''} x${orderedQuantity}${isOrderUpdate ? ' (order update)' : ''}`);
+      
+      // For order updates, skip individual stock deductions - BigCommerce handles these automatically
+      if (isOrderUpdate && orderedQuantity === 0) {
+        console.log(`[Order Webhook] Skipping stock deduction for order update - BigCommerce handles automatically`);
+      }
       
       // Check if this ordered item is a known bundle
       let isItemABundle = false;
@@ -226,22 +254,28 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
           console.log(`[Order Webhook] Ordered item is a variant bundle: ${productId}:${variantId}`);
           isItemABundle = true;
           
-          // Deduct stock from each component in the bundle
-          for (const linkedProduct of variantBundle.linkedProductIds) {
-            const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
-            const totalQuantity = orderedQuantity * quantity;
-            
-            const key = targetVariantId ? `${targetProductId}:${targetVariantId}` : `${targetProductId}`;
-            const current = inventoryUpdates.get(key);
-            const newDeduction = (current?.newLevel || 0) + totalQuantity;
-            
-            inventoryUpdates.set(key, {
-              productId: targetProductId,
-              variantId: targetVariantId,
-              newLevel: newDeduction
-            });
-            
-            console.log(`[Order Webhook] Will deduct ${totalQuantity} from ${key}`);
+          // Only deduct stock from bundle components for new orders
+          // For order updates, BigCommerce handles the stock changes automatically
+          if (!isOrderUpdate && orderedQuantity > 0) {
+            // Deduct stock from each component in the bundle
+            for (const linkedProduct of variantBundle.linkedProductIds) {
+              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
+              const totalQuantity = orderedQuantity * quantity;
+              
+              const key = targetVariantId ? `${targetProductId}:${targetVariantId}` : `${targetProductId}`;
+              const current = inventoryUpdates.get(key);
+              const newDeduction = (current?.newLevel || 0) + totalQuantity;
+              
+              inventoryUpdates.set(key, {
+                productId: targetProductId,
+                variantId: targetVariantId,
+                newLevel: newDeduction
+              });
+              
+              console.log(`[Order Webhook] Will deduct ${totalQuantity} from ${key}`);
+            }
+          } else if (isOrderUpdate) {
+            console.log(`[Order Webhook] Skipping bundle component deduction for order update - BigCommerce handles automatically`);
           }
         }
       }
@@ -253,29 +287,37 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
           console.log(`[Order Webhook] Ordered item is a product bundle: ${productId}`);
           isItemABundle = true;
           
-          // Deduct stock from each component in the bundle
-          for (const linkedProduct of productBundle.linkedProductIds) {
-              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
-              const totalQuantity = orderedQuantity * quantity;
-            
-            const key = targetVariantId ? `${targetProductId}:${targetVariantId}` : `${targetProductId}`;
-            const current = inventoryUpdates.get(key);
-            const newDeduction = (current?.newLevel || 0) + totalQuantity;
-            
-            inventoryUpdates.set(key, {
-              productId: targetProductId,
-              variantId: targetVariantId,
-              newLevel: newDeduction
-            });
-            
-            console.log(`[Order Webhook] Will deduct ${totalQuantity} from ${key}`);
+          // Only deduct stock from bundle components for new orders
+          // For order updates, BigCommerce handles the stock changes automatically
+          if (!isOrderUpdate && orderedQuantity > 0) {
+            // Deduct stock from each component in the bundle
+            for (const linkedProduct of productBundle.linkedProductIds) {
+                const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
+                const totalQuantity = orderedQuantity * quantity;
+              
+              const key = targetVariantId ? `${targetProductId}:${targetVariantId}` : `${targetProductId}`;
+              const current = inventoryUpdates.get(key);
+              const newDeduction = (current?.newLevel || 0) + totalQuantity;
+              
+              inventoryUpdates.set(key, {
+                productId: targetProductId,
+                variantId: targetVariantId,
+                newLevel: newDeduction
+              });
+              
+              console.log(`[Order Webhook] Will deduct ${totalQuantity} from ${key}`);
+            }
+          } else if (isOrderUpdate) {
+            console.log(`[Order Webhook] Skipping bundle component deduction for order update - BigCommerce handles automatically`);
           }
         }
       }
       
       if (!isItemABundle) {
         // Individual item purchased - mark bundles containing this item for recalculation
-        console.log(`[Order Webhook] Individual item purchased: ${productId}${variantId ? `:${variantId}` : ''}`);
+        // For order updates, we still need to recalculate bundles because the item quantities may have changed
+        const displayQuantity = isOrderUpdate ? item.originalQuantity : orderedQuantity;
+        console.log(`[Order Webhook] Individual item purchased: ${productId}${variantId ? `:${variantId}` : ''} (qty: ${displayQuantity})`);
         
         // Find bundles that contain this product/variant
         for (const bundle of bundleProducts) {
@@ -288,7 +330,7 @@ return targetProductId === productId && (!variantId || targetVariantId === varia
           
           if (containsItem) {
             bundleRecalculations.add(`product:${bundle.id}`);
-            console.log(`[Order Webhook] Bundle ${bundle.id} needs recalculation`);
+            console.log(`[Order Webhook] Bundle ${bundle.id} needs recalculation ${isOrderUpdate ? '(order update)' : ''}`);
           }
         }
         
@@ -302,8 +344,18 @@ return targetProductId === productId && (!variantId || targetVariantId === varia
           
           if (containsItem) {
             bundleRecalculations.add(`variant:${bundle.productId}:${bundle.variantId}`);
-            console.log(`[Order Webhook] Variant bundle ${bundle.productId}:${bundle.variantId} needs recalculation`);
+            console.log(`[Order Webhook] Variant bundle ${bundle.productId}:${bundle.variantId} needs recalculation ${isOrderUpdate ? '(order update)' : ''}`);
           }
+        }
+      } else if (isOrderUpdate) {
+        // Even if item is a bundle, we need to recalculate bundle stock for order updates
+        // because BigCommerce may have changed the bundle's own stock level
+        if (variantId) {
+          bundleRecalculations.add(`variant:${productId}:${variantId}`);
+          console.log(`[Order Webhook] Variant bundle ${productId}:${variantId} needs recalculation (order update)`);
+        } else {
+          bundleRecalculations.add(`product:${productId}`);
+          console.log(`[Order Webhook] Product bundle ${productId} needs recalculation (order update)`);
         }
       }
     }
@@ -356,89 +408,8 @@ return targetProductId === productId && (!variantId || targetVariantId === varia
       }
     }
 
-    // Recalculate affected bundles
-    console.log(`[Order Webhook] Recalculating ${bundleRecalculations.size} affected bundles`);
-    for (const bundleKey of Array.from(bundleRecalculations)) {
-      try {
-        if (bundleKey.startsWith('product:')) {
-          const bundleId = parseInt(bundleKey.split(':')[1]);
-          const bundle = bundleProducts.find(b => b.id === bundleId);
-          if (bundle) {
-            let minPossibleBundles = Infinity;
-            for (const linkedProduct of bundle.linkedProductIds) {
-              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
-              
-              if (targetVariantId) {
-                const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
-                const possibleBundles = Math.floor(linkedVariant.inventory_level / quantity);
-                minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-              } else {
-                const { data: linkedProductObj } = await bc.get(`/catalog/products/${targetProductId}`);
-                const possibleBundles = Math.floor(linkedProductObj.inventory_level / quantity);
-                minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-              }
-            }
-            
-            const newInventoryLevel = Math.max(0, minPossibleBundles);
-            
-            const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products`, {
-              method: 'PUT',
-              headers: {
-                'X-Auth-Token': accessToken,
-                'Content-Type': 'application/json',
-                'X-Bundle-App-Update': 'true' // Prevent webhook loops
-              },
-              body: JSON.stringify([{ id: bundleId, inventory_level: newInventoryLevel }])
-            });
-            
-            if (response.ok) {
-              console.log(`[Order Webhook] Updated bundle ${bundleId} inventory to ${newInventoryLevel}`);
-          } else {
-              console.error(`[Order Webhook] Failed to update bundle ${bundleId}: ${response.status}`);
-            }
-          }
-        } else if (bundleKey.startsWith('variant:')) {
-          const [, bundleProductId, bundleVariantId] = bundleKey.split(':');
-          const bundle = bundleVariants.find(b => b.productId === parseInt(bundleProductId) && b.variantId === parseInt(bundleVariantId));
-          if (bundle) {
-            let minPossibleBundles = Infinity;
-            for (const linkedProduct of bundle.linkedProductIds) {
-              const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
-              
-              if (targetVariantId) {
-                const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
-                const possibleBundles = Math.floor(linkedVariant.inventory_level / quantity);
-                minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-              } else {
-                const { data: linkedProductObj } = await bc.get(`/catalog/products/${targetProductId}`);
-                const possibleBundles = Math.floor(linkedProductObj.inventory_level / quantity);
-                minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-              }
-            }
-            
-            const newInventoryLevel = Math.max(0, minPossibleBundles);
-            
-            const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${bundleProductId}/variants/${bundleVariantId}`, {
-              method: 'PUT',
-              headers: {
-                'X-Auth-Token': accessToken,
-                'Content-Type': 'application/json',
-                'X-Bundle-App-Update': 'true' // Prevent webhook loops
-              },
-              body: JSON.stringify({ inventory_level: newInventoryLevel })
-            });
-            
-            if (response.ok) {
-              console.log(`[Order Webhook] Updated variant bundle ${bundleProductId}:${bundleVariantId} inventory to ${newInventoryLevel}`);
-            } else {
-              console.error(`[Order Webhook] Failed to update variant bundle ${bundleProductId}:${bundleVariantId}: ${response.status}`);
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`[Order Webhook] Failed to recalculate bundle ${bundleKey}:`, error);
-      }
-    }
+    // Recalculate affected bundles using shared utility
+    await recalculateBundlesFromKeys(bundleRecalculations, bundleProducts, bundleVariants, bc, storeHash, accessToken);
 
     res.status(200).json({ message: 'Stock levels updated successfully' });
   } catch (err: any) {

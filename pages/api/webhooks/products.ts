@@ -1,5 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { bigcommerceClient } from '../../../lib/auth';
+import { 
+  recalculateProductBundles, 
+  recalculateVariantBundles 
+} from '../../../lib/bundle-calculator';
 import db from '../../../lib/db';
 
 // Utility to get bundle info for a product
@@ -22,14 +26,7 @@ async function getVariantBundleInfo(productId: number, variantId: number, bc: an
   return { isBundle, linkedProductIds };
 }
 
-// Utility to parse linked product info
-function parseLinkedProduct(linkedProduct: any) {
-  return {
-    productId: typeof linkedProduct === 'object' ? linkedProduct.productId : linkedProduct,
-    variantId: typeof linkedProduct === 'object' ? linkedProduct.variantId : null,
-    quantity: typeof linkedProduct === 'object' ? linkedProduct.quantity : 1,
-  };
-}
+// parseLinkedProduct function moved to lib/bundle-calculator.ts
 
 // Helper function to get bundle category ID
 async function getBundleCategoryId(bc: any) {
@@ -156,116 +153,11 @@ return false;
   
   console.log(`[Product Update] Found ${affectedProductBundles.length} product bundles and ${affectedVariantBundles.length} variant bundles to update`);
   
-  // Calculate and update product bundles
-  if (affectedProductBundles.length > 0) {
-    const productBundleUpdates = [];
-    for (const bundle of affectedProductBundles) {
-      let minPossibleBundles = Infinity;
-      for (const linkedProduct of bundle.linkedProductIds) {
-        const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
-        
-        if (targetVariantId) {
-          const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
-          const possibleBundles = Math.floor(linkedVariant.inventory_level / quantity);
-          minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-        } else {
-          const { data: linkedProductObj } = await bc.get(`/catalog/products/${targetProductId}`);
-          const possibleBundles = Math.floor(linkedProductObj.inventory_level / quantity);
-          minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-        }
-      }
-      
-      const newInventoryLevel = Math.max(0, minPossibleBundles);
-      productBundleUpdates.push({
-        id: bundle.id,
-        inventory_level: newInventoryLevel
-      });
-      
-      console.log(`[Product Update] Calculated product bundle ${bundle.id} inventory: ${newInventoryLevel}`);
-    }
+  // Calculate and update product bundles using shared utility
+  await recalculateProductBundles(affectedProductBundles, bc, storeHash, accessToken);
 
-    // Bulk update product bundles
-    console.log(`[Product Update] Bulk updating ${productBundleUpdates.length} product bundles`);
-    
-    const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products`, {
-      method: 'PUT',
-      headers: {
-        'X-Auth-Token': accessToken,
-        'Content-Type': 'application/json',
-        'X-Bundle-App-Update': 'true'
-      },
-      body: JSON.stringify(productBundleUpdates)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[Product Update] Failed to bulk update product bundles: ${response.status} - ${errorText}`);
-    } else {
-      console.log(`[Product Update] Successfully bulk updated ${productBundleUpdates.length} product bundles`);
-    }
-  }
-
-  // Calculate and update variant bundles
-  if (affectedVariantBundles.length > 0) {
-    const variantUpdatesByProduct: Record<string, Array<{id: number, inventory_level: number}>> = {};
-    
-    for (const bundle of affectedVariantBundles) {
-      let minPossibleBundles = Infinity;
-      for (const linkedProduct of bundle.linkedProductIds) {
-        const { productId: targetProductId, variantId: targetVariantId, quantity } = parseLinkedProduct(linkedProduct);
-        
-        if (targetVariantId) {
-          const { data: linkedVariant } = await bc.get(`/catalog/products/${targetProductId}/variants/${targetVariantId}`);
-          const possibleBundles = Math.floor(linkedVariant.inventory_level / quantity);
-          minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-        } else {
-          const { data: linkedProductObj } = await bc.get(`/catalog/products/${targetProductId}`);
-          const possibleBundles = Math.floor(linkedProductObj.inventory_level / quantity);
-          minPossibleBundles = Math.min(minPossibleBundles, possibleBundles);
-        }
-      }
-      
-      const newInventoryLevel = Math.max(0, minPossibleBundles);
-      
-      if (!variantUpdatesByProduct[bundle.productId]) {
-        variantUpdatesByProduct[bundle.productId] = [];
-      }
-      variantUpdatesByProduct[bundle.productId].push({
-        id: bundle.variantId,
-        inventory_level: newInventoryLevel
-      });
-      
-      console.log(`[Product Update] Calculated variant bundle ${bundle.productId}:${bundle.variantId} inventory: ${newInventoryLevel}`);
-    }
-
-    // Update variant bundles individually
-    for (const [productId, variantUpdates] of Object.entries(variantUpdatesByProduct)) {
-      console.log(`[Product Update] Updating ${variantUpdates.length} variants for product ${productId}`);
-      
-      for (const variantUpdate of variantUpdates) {
-        try {
-          const response = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/variants/${variantUpdate.id}`, {
-            method: 'PUT',
-            headers: {
-              'X-Auth-Token': accessToken,
-              'Content-Type': 'application/json',
-              'X-Bundle-App-Update': 'true'
-            },
-            body: JSON.stringify({ inventory_level: variantUpdate.inventory_level })
-          });
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`[Product Update] Failed to update variant ${variantUpdate.id} for product ${productId}: ${response.status} - ${errorText}`);
-          } else {
-            console.log(`[Product Update] Successfully updated variant ${variantUpdate.id} inventory to ${variantUpdate.inventory_level}`);
-          }
-        } catch (error) {
-          console.error(`[Product Update] Error updating variant ${variantUpdate.id}:`, error);
-        }
-      }
-    }
-  }
+  // Calculate and update variant bundles using shared utility
+  await recalculateVariantBundles(affectedVariantBundles, bc, storeHash, accessToken);
 }
 
 
