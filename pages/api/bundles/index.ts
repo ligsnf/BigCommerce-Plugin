@@ -16,10 +16,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     const bc = bigcommerceClient(accessToken, storeHash);
 
-    // Get all products
-    const { data: products } = await bc.get('/catalog/products');
+    // Get bundle category ID for filtering
+    const { data: categories } = await bc.get('/catalog/categories?limit=250');
+    const bundleCategory = categories.find((c: any) => String(c?.name || '').toLowerCase() === 'bundle');
+    
+    if (!bundleCategory) {
+      return res.status(200).json([]); // No bundles category exists yet
+    }
 
-    // Get metafields for each product to identify bundles
+    // Get only products in the bundle category - much more efficient!
+    const { data: products } = await bc.get(`/catalog/products?categories:in=${bundleCategory.id}`);
+
+    // Get metafields for each bundle product to get details
     const bundles = [];
 
     for (const product of products) {

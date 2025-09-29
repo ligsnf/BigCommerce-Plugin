@@ -76,9 +76,20 @@ const ProductAppExtension = () => {
 
   // Format available products for react-select (main products only)
   const products = list
-    .filter(({ id }) => {
+    .filter(({ id, variants, inventory_tracking }) => {
       if (id === productId) return false;
       if (bundleProductIds.has(id)) return false;
+      
+      // Filter out products with variants that use product-level tracking
+      const hasMultipleVariants = variants && variants.length > 1;
+      if (hasMultipleVariants && inventory_tracking !== "variant") {
+        return false;
+      }
+      
+      // Filter out products with no inventory tracking
+      if (inventory_tracking === "none") {
+        return false;
+      }
 
       return true;
     })
@@ -134,6 +145,7 @@ const ProductAppExtension = () => {
     const product = products.find(p => p.value === selectedItem.productId);
     if (!product) return;
 
+    // Since products are pre-filtered, we only need basic validation here
     const hasMultipleVariants = product.variants && product.variants.length > 1;
     const hasInventoryTracking = selectedItem.isMainProduct
       ? product.inventory_tracking === "product"
@@ -503,6 +515,31 @@ return;
           ? Object.values(variantLinkedProducts).some(products => (products as any[]).length > 0)
           : linkedProducts.length > 0
       );
+
+      // NEW: Validate tracking configuration of all linked products before saving
+      if (isActuallyBundle) {
+        const allLinkedProducts = hasMultipleVariants 
+          ? Object.values(variantLinkedProducts).flat()
+          : linkedProducts;
+        
+        for (const linkedProduct of allLinkedProducts as any[]) {
+          const productId = linkedProduct.productId || linkedProduct.value;
+          const productData = products.find(p => p.value === productId);
+          
+          if (productData && productData.variants && productData.variants.length > 1 && productData.inventory_tracking !== "variant") {
+            alertsManager.add({
+              messages: [{ 
+                text: `Cannot save bundle: "${productData.label}" has variants but uses product-level inventory tracking. Please change it to "Track inventory by options" in the product settings first.` 
+              }],
+              type: 'error',
+              onClose: () => null,
+            });
+            setSaving(false);
+            
+return;
+          }
+        }
+      }
 
       // Validate for duplicate SKUs across variants
       if (hasMultipleVariants && isActuallyBundle) {

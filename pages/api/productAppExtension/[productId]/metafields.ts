@@ -17,13 +17,21 @@ const setCache = (key: string, value: any, ttlMs = 60_000) => {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const productId = req.query.productId;
+  try {
+    const productId = req.query.productId;
 
-  if (!productId || typeof productId !== 'string') {
-    return res.status(400).json({ message: 'Invalid product ID' });
-  }
+    if (!productId || typeof productId !== 'string') {
+      return res.status(400).json({ message: 'Invalid product ID' });
+    }
 
-  const { accessToken, storeHash } = await getSession(req);
+    const session = await getSession(req);
+    if (!session || !session.accessToken || !session.storeHash) {
+      console.error('[GET metafields] Session error:', session);
+      
+return res.status(401).json({ message: 'Invalid session or missing auth data' });
+    }
+
+    const { accessToken, storeHash } = session;
   const baseUrl = `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/metafields`;
 
   // GET: Retrieve metafields
@@ -44,13 +52,47 @@ return res.status(200).json(hit);
         },
       });
 
-      const { data } = await response.json();
+      if (!response.ok) {
+        console.error(`[GET metafields] API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`[GET metafields] Error response:`, errorText);
+        throw new Error(`BigCommerce API error: ${response.status} - ${errorText}`);
+      }
+
+      const responseText = await response.text();
+      if (!responseText.trim()) {
+        console.error('[GET metafields] Empty response from BigCommerce API');
+        const payload = { isBundle: false, linkedProductIds: [], overridePrice: null, originalSku: null };
+        setCache(cacheKey, payload, 60_000);
+        res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=120');
+        
+return res.status(200).json(payload);
+      }
+
+      let parsedResponse;
+      try {
+        parsedResponse = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('[GET metafields] Failed to parse response as JSON:', parseError);
+        console.error('[GET metafields] Raw response:', responseText);
+        throw new Error(`Invalid JSON response from BigCommerce API`);
+      }
+
+      const { data } = parsedResponse;
 
       const isBundle = data.find(f => f.key === 'is_bundle')?.value === 'true';
       const linkedIdsRaw = data.find(f => f.key === 'linked_product_ids')?.value;
       const overridePriceRaw = data.find(f => f.key === 'override_price')?.value;
       const originalSkuRaw = data.find(f => f.key === 'original_sku')?.value;
-      let linkedProductIds = linkedIdsRaw ? JSON.parse(linkedIdsRaw) : [];
+      let linkedProductIds = [];
+      if (linkedIdsRaw) {
+        try {
+          linkedProductIds = JSON.parse(linkedIdsRaw);
+        } catch (e) {
+          console.warn('[GET metafields] Invalid JSON in linked_product_ids:', linkedIdsRaw);
+          linkedProductIds = [];
+        }
+      }
       // Normalize: always return array of { productId, variantId, quantity }
       linkedProductIds = linkedProductIds.map(item => {
         if (typeof item === 'object' && item !== null) {
@@ -206,6 +248,15 @@ return res.status(200).json(payload);
     }
   }
 
-  // Method not allowed
-  return res.status(405).setHeader('Allow', 'GET, POST').end('Method Not Allowed');
+    // Method not allowed
+    return res.status(405).setHeader('Allow', 'GET, POST').end('Method Not Allowed');
+  } catch (error: any) {
+    console.error('[metafields handler] Unexpected error:', error);
+    
+return res.status(500).json({ 
+      message: 'Internal server error', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
 }

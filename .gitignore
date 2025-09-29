@@ -102,3 +102,6 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Warp project rules
+WARP.md
