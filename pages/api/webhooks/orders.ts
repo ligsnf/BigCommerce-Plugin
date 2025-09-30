@@ -190,9 +190,10 @@ return res.status(200).json({ message: 'Webhook scope not handled' });
 
     const currentOrderItems = await orderProductsRes.json();
 
-    // Check if this is a canceled or refunded order
+    // Check if this is a canceled, refunded, or partially refunded order
     const isCanceled = statusId === 5; // Cancelled
     const isRefunded = statusId === 4; // Refunded
+    const isPartiallyRefunded = statusId === 14; // Partially Refunded
     const shouldRestoreInventory = isCanceled || isRefunded;
 
     // Handle new orders vs order updates differently
@@ -230,6 +231,38 @@ return res.status(200).json({ message: 'Webhook scope not handled' });
       
       // Update history to mark as processed
       await storeOrderHistory(orderId, storeHash, currentOrderItems);
+    } else if (isPartiallyRefunded) {
+      // For partially refunded orders, restore inventory based on quantity_refunded field
+      console.log(`[Order Webhook] Order ${orderId} is ${status} - processing partial refund`);
+      
+      // Process items with quantity_refunded > 0
+      itemsToProcess = currentOrderItems
+        .filter(item => item.quantity_refunded && item.quantity_refunded > 0)
+        .map(item => ({
+          product_id: item.product_id,
+          variant_id: item.variant_id,
+          name: item.name,
+          quantity: -item.quantity_refunded, // Negative to restore refunded quantity
+          originalQuantity: item.quantity - item.quantity_refunded, // Remaining valid quantity
+          isOrderUpdate: true,
+          changeType: 'partial_refund'
+        }));
+      
+      console.log(`[Order Webhook] Will restore inventory for ${itemsToProcess.length} partially refunded items`);
+      itemsToProcess.forEach(item => {
+        console.log(`  - ${item.name}: restoring ${Math.abs(item.quantity)} units (${item.originalQuantity} remaining)`);
+      });
+      
+      // Store adjusted quantities (net remaining after refund) in history
+      // This ensures future cancellations only restore the remaining quantity
+      const adjustedItems = currentOrderItems.map(item => ({
+        ...item,
+        quantity: item.quantity - (item.quantity_refunded || 0), // Store NET quantity
+        // Keep quantity_refunded for reference
+      }));
+      
+      console.log(`[Order Webhook] Storing adjusted order history with net quantities`);
+      await storeOrderHistory(orderId, storeHash, adjustedItems);
     } else {
       // For regular order updates, calculate deltas to handle edits properly
       console.log('[Order Webhook] Processing order update - calculating deltas');
