@@ -38,7 +38,7 @@ async function getVariantBundleInfo(productId: number, variantId: number, bc: an
 // parseLinkedProduct function moved to lib/bundle-calculator.ts
 
 // Check if order is newly created by comparing date_created and date_modified
-async function checkIfNewOrder(orderId: number, storeHash: string, accessToken: string) {
+async function checkOrderStatus(orderId: number, storeHash: string, accessToken: string) {
   try {
     const orderResponse = await fetch(`https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${orderId}`, {
       method: 'GET',
@@ -51,7 +51,7 @@ async function checkIfNewOrder(orderId: number, storeHash: string, accessToken: 
     if (!orderResponse.ok) {
       console.warn('[Order Webhook] Could not fetch order details, assuming new order');
       
-return true; // Default to treating as new order if we can't check
+      return { isNewOrder: true, statusId: null, status: null };
     }
 
     const orderData = await orderResponse.json();
@@ -70,11 +70,11 @@ return true; // Default to treating as new order if we can't check
     
     console.log(`[Order Webhook] Order ${orderId} - created: ${dateCreated}, modified: ${dateModified}, status: ${status} (${statusId}), difference: ${timeDifferenceSeconds}s, treating as ${isNewOrder ? 'new order' : 'edit'}`);
     
-    return isNewOrder;
+    return { isNewOrder, statusId, status };
   } catch (error) {
     console.warn('[Order Webhook] Error checking order timestamps, assuming new order:', error);
     
-return true; // Default to treating as new order on error
+    return { isNewOrder: true, statusId: null, status: null };
   }
 }
 
@@ -171,7 +171,7 @@ return res.status(200).json({ message: 'Webhook scope not handled' });
     }
 
     // Check if this is a new order or an edit by comparing timestamps
-    const isNewOrder = await checkIfNewOrder(orderId, storeHash, accessToken);
+    const { isNewOrder, statusId, status } = await checkOrderStatus(orderId, storeHash, accessToken);
     console.log(`[Order Webhook] Processing ${isNewOrder ? 'new order' : 'order update'}: ${orderId}`);
 
     // Fetch order products using V2 API manually
@@ -190,6 +190,11 @@ return res.status(200).json({ message: 'Webhook scope not handled' });
 
     const currentOrderItems = await orderProductsRes.json();
 
+    // Check if this is a canceled or refunded order
+    const isCanceled = statusId === 5; // Cancelled
+    const isRefunded = statusId === 4; // Refunded
+    const shouldRestoreInventory = isCanceled || isRefunded;
+
     // Handle new orders vs order updates differently
     let itemsToProcess = currentOrderItems;
     
@@ -199,8 +204,34 @@ return res.status(200).json({ message: 'Webhook scope not handled' });
       
       // Store order history for future comparisons
       await storeOrderHistory(orderId, storeHash, currentOrderItems);
+    } else if (shouldRestoreInventory) {
+      // For canceled/refunded orders, restore all inventory by inverting quantities
+      console.log(`[Order Webhook] Order ${orderId} is ${status} - restoring full inventory`);
+      
+      // Get the original order items from history
+      const previousItems = await getOrderHistory(orderId, storeHash);
+      
+      if (previousItems && previousItems.length > 0) {
+        // Invert the quantities to restore inventory
+        itemsToProcess = previousItems.map(item => ({
+          product_id: item.product_id,
+          variant_id: item.variant_id,
+          name: item.name,
+          quantity: -item.quantity, // Negative to restore
+          originalQuantity: 0, // Current quantity is effectively 0
+          isOrderUpdate: true,
+          changeType: 'cancelled'
+        }));
+        console.log(`[Order Webhook] Will restore inventory for ${itemsToProcess.length} items from canceled/refunded order`);
+      } else {
+        console.warn(`[Order Webhook] No order history found for ${status} order ${orderId}, cannot restore inventory`);
+        itemsToProcess = [];
+      }
+      
+      // Update history to mark as processed
+      await storeOrderHistory(orderId, storeHash, currentOrderItems);
     } else {
-      // For order updates, calculate deltas to handle edits properly
+      // For regular order updates, calculate deltas to handle edits properly
       console.log('[Order Webhook] Processing order update - calculating deltas');
       itemsToProcess = await calculateOrderUpdateDeltas(orderId, currentOrderItems, storeHash);
       
