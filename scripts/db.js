@@ -181,7 +181,11 @@ export { getStoreCredentials };
 (async () => {
   try {
     await createTables();
-    await syncProductsFromBigCommerce();
+    
+    // Only sync products if explicitly running db:setup (not during builds)
+    if (process.env.SKIP_PRODUCT_SYNC !== 'true') {
+      await syncProductsFromBigCommerce();
+    }
   } catch (err) {
     console.error('[DB] ❌ Error:', err.message);
   }
