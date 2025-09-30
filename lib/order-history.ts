@@ -1,5 +1,5 @@
-import db from './db';
 import { sql } from './database.js';
+import db from './db';
 
 export interface OrderItem {
   product_id: number;
@@ -29,7 +29,8 @@ export async function storeOrderHistory(
     const storeToken = await db.getStoreToken(storeHash);
     if (!storeToken) {
       console.warn(`[Order History] No store token found for ${storeHash}`);
-      return;
+      
+return;
     }
 
     // Ensure orderItems is an array
@@ -66,22 +67,26 @@ export async function getOrderHistory(
     
     if (result.length === 0) {
       console.log(`[Order History] No previous history found for order ${orderId}`);
-      return null;
+      
+return null;
     }
     
     try {
       const rawData = result[0].order_items;
       const orderItems = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
       console.log(`[Order History] Retrieved history for order ${orderId} (${orderItems.length} items)`);
-      return orderItems;
+      
+return orderItems;
     } catch (parseError) {
       console.error(`[Order History] Failed to parse order items for order ${orderId}:`, parseError);
       console.error(`[Order History] Raw data:`, result[0].order_items);
-      return null;
+      
+return null;
     }
   } catch (error) {
     console.error(`[Order History] Failed to get order ${orderId} history:`, error);
-    return null;
+    
+return null;
   }
 }
 
@@ -176,7 +181,7 @@ export function calculateOrderDeltas(
 // Clean up old order history (keep last 30 days)
 export async function cleanupOrderHistory(): Promise<void> {
   try {
-    const result = await sql`
+    await sql`
       DELETE FROM order_history 
       WHERE created_at < NOW() - INTERVAL '30 days'
     `;

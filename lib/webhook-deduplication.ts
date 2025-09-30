@@ -30,13 +30,15 @@ export async function checkWebhookDuplicate(
       `;
       
       console.log(`[Webhook Dedup] New webhook registered: ${webhookId}`);
-      return { isDuplicate: false, webhookId };
+      
+return { isDuplicate: false, webhookId };
       
     } catch (insertError: any) {
       // Check if error is due to duplicate key (UNIQUE constraint violation)
       if (insertError.code === '23505' || insertError.message?.includes('duplicate key')) {
         console.log(`[Webhook Dedup] Duplicate webhook detected (atomic insert failed): ${webhookId}`);
-        return { isDuplicate: true, webhookId };
+        
+return { isDuplicate: true, webhookId };
       }
       
       // For other errors, check manually
@@ -49,7 +51,8 @@ export async function checkWebhookDuplicate(
       
       if (existing.length > 0) {
         console.log(`[Webhook Dedup] Duplicate webhook detected: ${webhookId} (first processed: ${existing[0].processed_at})`);
-        return { isDuplicate: true, webhookId };
+        
+return { isDuplicate: true, webhookId };
       }
       
       // Also check for very recent webhooks for the same order (within 5 seconds)
@@ -64,17 +67,20 @@ export async function checkWebhookDuplicate(
       
       if (recentWebhooks.length > 0) {
         console.log(`[Webhook Dedup] Recent webhook for order ${orderId} detected within 5 seconds`);
-        return { isDuplicate: true, webhookId };
+        
+return { isDuplicate: true, webhookId };
       }
       
       // Unknown error but no duplicate found - allow processing
       console.warn(`[Webhook Dedup] Warning: Insert failed but no duplicate found:`, insertError);
-      return { isDuplicate: false, webhookId };
+      
+return { isDuplicate: false, webhookId };
     }
     
   } catch (error) {
     console.error('[Webhook Dedup] Error checking webhook duplicate:', error);
     // On error, allow processing but log the issue
+
     return { isDuplicate: false, webhookId };
   }
 }
@@ -102,7 +108,7 @@ export async function markWebhookProcessed(
 // Clean up expired webhook records (call this periodically)
 export async function cleanupExpiredWebhooks(): Promise<void> {
   try {
-    const result = await sql`
+    await sql`
       DELETE FROM webhook_processed 
       WHERE expires_at < CURRENT_TIMESTAMP
     `;

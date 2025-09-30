@@ -4,17 +4,16 @@ import {
   parseLinkedProduct, 
   recalculateBundlesFromKeys 
 } from '../../../lib/bundle-calculator';
+import db from '../../../lib/db';
 import { 
-  storeOrderHistory, 
+  calculateOrderDeltas, 
   getOrderHistory, 
-  calculateOrderDeltas,
-  type OrderDelta 
+  storeOrderHistory 
 } from '../../../lib/order-history';
 import { 
   checkWebhookDuplicate,
   cleanupExpiredWebhooks 
 } from '../../../lib/webhook-deduplication';
-import db from '../../../lib/db';
 
 // Utility to get bundle info for a product
 async function getProductBundleInfo(productId: number, bc: any) {
@@ -148,7 +147,8 @@ return res.status(200).json({ message: 'Skipped app-generated update' });
     
     if (isDuplicate) {
       console.log(`[Order Webhook] Duplicate webhook detected for order ${orderId}, skipping processing`);
-      return res.status(200).json({ message: 'Duplicate webhook ignored', webhookId });
+      
+return res.status(200).json({ message: 'Duplicate webhook ignored', webhookId });
     }
     
     // Webhook is now registered atomically - safe to process
