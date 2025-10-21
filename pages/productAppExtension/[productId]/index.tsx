@@ -4,7 +4,7 @@ import BundleSettingsPanel from '@components/BundleSettingsPanel';
 import ErrorMessage from '@components/error';
 import Loading from '@components/loading';
 import { alertsManager } from '@lib/alerts';
-import { useProductInfo, useProductList, useAllProducts } from '@lib/hooks';
+import { useAllProducts, useProductInfo} from '@lib/hooks';
 
 interface Variant {
   id: number;
